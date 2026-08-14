@@ -17,9 +17,9 @@ public:
     void update();
 
 private:
-    void queue(Event event);
+    void _queue(Event event);
 
-    std::vector<EventSource*> sources_;
-    std::vector<EventListener*> listeners_;
-    std::vector<Event> pendingEvents_;
+    std::vector<EventSource*> _sources;
+    std::vector<EventListener*> _listeners;
+    std::vector<Event> _pendingEvents;
 };

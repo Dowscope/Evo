@@ -9,6 +9,11 @@ See `Documentation/README.md` for the user and programmer manual.
 Startup settings are stored in `config/evo.cfg`. Persistent runtime data is
 created locally under `Data/`.
 
+## Current rendering status
+
+The camera, event routing, and game-owned dirt land scene are implemented. The
+Vulkan draw pipeline is the next milestone, so the platform is not visible yet.
+
 ## Requirements
 
 - A C++23 compiler

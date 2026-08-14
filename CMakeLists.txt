@@ -9,6 +9,7 @@ add_executable(EVO
     src/main.cpp
     src/core/ApplicationConfig.cpp
     src/core/Logger.cpp
+    src/systems/CameraSystem.cpp
     src/systems/EventSystem.cpp
     src/systems/GameSystem.cpp
     src/systems/ScreenSystem.cpp

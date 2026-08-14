@@ -1,6 +1,7 @@
 #include "core/Logger.hpp"
 #include "core/ApplicationConfig.hpp"
 #include "systems/EventSystem.hpp"
+#include "systems/CameraSystem.hpp"
 #include "systems/GameSystem.hpp"
 #include "systems/ScreenSystem.hpp"
 #include "systems/SaveSystem.hpp"
@@ -12,6 +13,7 @@
 namespace {
 
 std::unique_ptr<EventSystem> eventSystem;
+std::unique_ptr<CameraSystem> cameraSystem;
 std::unique_ptr<ScreenSystem> screenSystem;
 std::unique_ptr<GameSystem> gameSystem;
 std::unique_ptr<SaveSystem> saveSystem;
@@ -20,16 +22,20 @@ void init() {
     const ApplicationConfig config = ConfigLoader::load("config/evo.cfg");
 
     eventSystem = std::make_unique<EventSystem>();
+    cameraSystem = std::make_unique<CameraSystem>();
     saveSystem = std::make_unique<SaveSystem>("Data/evo.save");
     screenSystem = std::make_unique<ScreenSystem>(config.window);
     gameSystem = std::make_unique<GameSystem>();
 
     eventSystem->init();
+    cameraSystem->init();
     saveSystem->init();
     screenSystem->init();
 
     eventSystem->registerSource(*screenSystem);
     eventSystem->registerListener(*screenSystem);
+    eventSystem->registerListener(*cameraSystem);
+    screenSystem->registerCamera(*cameraSystem);
     gameSystem->registerRenderTarget(*screenSystem);
     gameSystem->registerPersistence(*saveSystem);
     gameSystem->init();
@@ -57,6 +63,7 @@ void shutdown() {
         saveSystem->flush();
     }
     screenSystem.reset();
+    cameraSystem.reset();
     saveSystem.reset();
     eventSystem.reset();
 }

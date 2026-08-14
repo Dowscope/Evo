@@ -11,28 +11,28 @@ void EventSystem::init() {
 }
 
 void EventSystem::registerSource(EventSource& source) {
-    sources_.push_back(&source);
-    source.setEventCallback([this](Event event) { queue(event); });
+    _sources.push_back(&source);
+    source.setEventCallback([this](Event event) { _queue(event); });
 }
 
 void EventSystem::registerListener(EventListener& listener) {
-    listeners_.push_back(&listener);
+    _listeners.push_back(&listener);
 }
 
 void EventSystem::update() {
-    for (EventSource* source : sources_) {
+    for (EventSource* source : _sources) {
         source->pollEvents();
     }
 
-    std::vector<Event> events = std::move(pendingEvents_);
-    pendingEvents_.clear();
+    std::vector<Event> events = std::move(_pendingEvents);
+    _pendingEvents.clear();
     for (const Event& event : events) {
-        for (EventListener* listener : listeners_) {
+        for (EventListener* listener : _listeners) {
             listener->onEvent(event);
         }
     }
 }
 
-void EventSystem::queue(Event event) {
-    pendingEvents_.push_back(event);
+void EventSystem::_queue(Event event) {
+    _pendingEvents.push_back(event);
 }

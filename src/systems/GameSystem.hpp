@@ -1,6 +1,7 @@
 #pragma once
 
 #include "systems/System.hpp"
+#include "rendering/Scene.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -20,11 +21,13 @@ public:
     void render();
 
 private:
-    void saveState();
+    void _saveState();
+    void _createLand();
 
-    RenderTarget* renderTarget_ = nullptr;
-    Persistence* persistence_ = nullptr;
-    std::uint64_t updateCount_ = 0;
-    std::chrono::steady_clock::time_point lastCheckpoint_ =
+    RenderTarget* _renderTarget = nullptr;
+    Persistence* _persistence = nullptr;
+    Land _land;
+    std::uint64_t _updateCount = 0;
+    std::chrono::steady_clock::time_point _lastCheckpoint =
         std::chrono::steady_clock::now();
 };

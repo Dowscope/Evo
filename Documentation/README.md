@@ -16,6 +16,16 @@ make run
 EVO opens in a 1280 x 720 window. Press Escape or use the window close button
 to exit.
 
+### Camera controls
+
+The camera input architecture is implemented. These controls will affect the
+visible scene once the Vulkan drawing pipeline is added:
+
+- Hold the left mouse button and drag to orbit around the land.
+- Hold the middle mouse button and drag to pan across the land.
+- Use the mouse wheel to zoom in and out.
+- Resizing the window automatically updates the camera viewport.
+
 ### Configuration
 
 Edit `config/evo.cfg` before starting EVO to change startup settings:
@@ -73,11 +83,13 @@ This keeps implementations replaceable and makes dependencies visible in
   also an event source, event listener, and render target.
 - `RenderSystem` is the interface implemented by rendering backends.
 - `VulkanSystem` is the current renderer and owns all Vulkan code and objects.
+- `CameraSystem` owns the 3D view and projection. It receives mouse input only
+  as events and registers with `ScreenSystem` through the `Camera` interface.
 - `EventSystem` polls registered event sources and dispatches queued events to
   registered listeners.
 - `GameSystem` contains game simulation behavior and renders only through its
   registered `RenderTarget`. It chooses which game state is persistent through
-  its registered `Persistence` interface.
+  its registered `Persistence` interface. It owns land and other world data.
 - `SaveSystem` owns the on-disk save file and atomic-style replacement writes.
 - `Logger` is the process-wide logging entry point. Systems use it instead of
   writing directly to standard output.
@@ -87,8 +99,8 @@ This keeps implementations replaceable and makes dependencies visible in
 ```text
 GLFW callback in ScreenSystem
     -> EventSystem queue
-    -> registered EventListener
-    -> ScreenSystem handles Escape
+    -> registered EventListener (ScreenSystem or CameraSystem)
+    -> listener handles the engine event
     -> window requests closure
     -> main game loop exits
 ```
@@ -99,6 +111,20 @@ Only `ScreenSystem` owns a `RenderSystem`. The active implementation is
 `VulkanSystem`. A future `DirectXSystem` should implement the same interface and
 be selected by `ScreenSystem`; no changes should be required in `GameSystem`,
 `EventSystem`, or the main loop.
+
+`GameSystem` creates the dirt land mesh and submits it as scene data.
+`ScreenSystem` combines that data with its registered camera frame, then passes
+the complete scene to `RenderSystem`. This keeps world creation out of the
+screen, camera, and Vulkan layers.
+
+`VulkanSystem` currently accepts this complete scene but only initializes the
+Vulkan instance. Swapchain creation, depth buffering, shaders, and draw commands
+are the next rendering milestone; until then, the dirt platform is not visible.
+
+### Naming convention
+
+Every private member variable and private method uses an `_camelCase` name.
+Public and protected APIs do not use the underscore prefix.
 
 ### Logging
 

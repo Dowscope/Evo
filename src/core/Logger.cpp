@@ -19,18 +19,18 @@ void Logger::write(std::string_view message) {
 }
 
 void Logger::info(std::string_view message) {
-    writeLevel("INFO", message);
+    _writeLevel("INFO", message);
 }
 
 void Logger::warning(std::string_view message) {
-    writeLevel("WARNING", message);
+    _writeLevel("WARNING", message);
 }
 
 void Logger::error(std::string_view message) {
-    writeLevel("ERROR", message);
+    _writeLevel("ERROR", message);
 }
 
-void Logger::writeLevel(std::string_view level, std::string_view message) {
+void Logger::_writeLevel(std::string_view level, std::string_view message) {
     const std::scoped_lock lock(outputMutex);
     std::cout << '[' << level << "] " << message << std::endl;
 }

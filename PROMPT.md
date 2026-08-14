@@ -14,6 +14,8 @@ user/programmer manual in `Documentation` when relevant.
 - Favor small, replaceable systems connected through explicit registration.
 - A system must not discover or access another system through globals or hidden
   singletons. It may only use dependencies explicitly registered with it.
+- Prefix every private member variable and private method with `_` using
+  `_camelCase`. Public and protected names do not receive the prefix.
 
 ## Configuration
 
@@ -77,6 +79,9 @@ or graphics implementation details directly in `main.cpp`.
   without requiring changes to the game, event system, or main loop.
 - `ScreenSystem` exposes narrow interfaces (`EventSource` and `RenderTarget`),
   not its GLFW or Vulkan internals.
+- `CameraSystem` registers with `ScreenSystem`. The screen synchronizes the
+  camera viewport to the framebuffer and uses its view for rendering.
+- `ScreenSystem` and rendering backends do not create game-world geometry.
 
 ## Events
 
@@ -86,10 +91,16 @@ or graphics implementation details directly in `main.cpp`.
 - Pressing Escape produces an event; `ScreenSystem` handles it by requesting
   window closure, which ends the main loop.
 - Add future input without leaking GLFW details into the rest of the program.
+- `ScreenSystem` translates GLFW callbacks into engine events; it does not
+  interpret mouse input. `EventSystem` alone dispatches those events.
+- `CameraSystem` registers with `EventSystem` as a listener for mouse movement,
+  mouse buttons, scrolling, and framebuffer-size events.
 
 ## Game
 
 - Game logic belongs in `GameSystem`.
+- Land and other game-world objects are created and owned by `GameSystem`, then
+  submitted as scene data through its registered render target.
 - A render target is explicitly registered with `GameSystem`; currently this is
   the `ScreenSystem` through the `RenderTarget` interface.
 - `GameSystem` must not know how the window or graphics backend is implemented.
@@ -114,8 +125,10 @@ or graphics implementation details directly in `main.cpp`.
 ```text
 main.cpp registers systems
     EventSystem <-> EventSource/EventListener interfaces <- ScreenSystem
+    EventSystem -> EventListener interface               <- CameraSystem
     GameSystem  -> RenderTarget interface               <- ScreenSystem
     GameSystem  -> Persistence interface                <- SaveSystem
+    ScreenSystem -> Camera interface                     <- CameraSystem
     ScreenSystem -> RenderSystem                        <- VulkanSystem
 ```
 

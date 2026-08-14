@@ -1,5 +1,6 @@
 #include "systems/ScreenSystem.hpp"
 
+#include "rendering/Camera.hpp"
 #include "systems/VulkanSystem.hpp"
 
 #include <GLFW/glfw3.h>
@@ -11,12 +12,12 @@
 #include <vector>
 
 ScreenSystem::ScreenSystem(WindowConfig config)
-    : System("Screen"), config_(std::move(config)) {}
+    : System("Screen"), _config(std::move(config)) {}
 
 ScreenSystem::~ScreenSystem() {
-    renderer_.reset();
-    if (window_ != nullptr) {
-        glfwDestroyWindow(window_);
+    _renderer.reset();
+    if (_window != nullptr) {
+        glfwDestroyWindow(_window);
     }
     glfwTerminate();
 }
@@ -30,20 +31,24 @@ void ScreenSystem::init() {
     }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    window_ = glfwCreateWindow(
-        config_.width,
-        config_.height,
-        config_.title.c_str(),
+    _window = glfwCreateWindow(
+        _config.width,
+        _config.height,
+        _config.title.c_str(),
         nullptr,
         nullptr
     );
-    if (window_ == nullptr) {
+    if (_window == nullptr) {
         throw std::runtime_error("Failed to create the EVO window");
     }
 
-    glfwSetWindowUserPointer(window_, this);
-    glfwSetKeyCallback(window_, handleKey);
-    glfwSetWindowCloseCallback(window_, handleWindowClose);
+    glfwSetWindowUserPointer(_window, this);
+    glfwSetKeyCallback(_window, _handleKey);
+    glfwSetWindowCloseCallback(_window, _handleWindowClose);
+    glfwSetCursorPosCallback(_window, _handleCursor);
+    glfwSetMouseButtonCallback(_window, _handleMouseButton);
+    glfwSetScrollCallback(_window, _handleScroll);
+    glfwSetFramebufferSizeCallback(_window, _handleFramebufferSize);
 
     std::uint32_t extensionCount = 0;
     const char** requiredExtensions =
@@ -58,13 +63,13 @@ void ScreenSystem::init() {
         extensions.emplace_back(requiredExtensions[index]);
     }
 
-    renderer_ = std::make_unique<VulkanSystem>(std::move(extensions));
-    renderer_->init();
+    _renderer = std::make_unique<VulkanSystem>(std::move(extensions));
+    _renderer->init();
     System::init();
 }
 
 void ScreenSystem::setEventCallback(EventCallback callback) {
-    eventCallback_ = std::move(callback);
+    _eventCallback = std::move(callback);
 }
 
 void ScreenSystem::pollEvents() {
@@ -73,19 +78,30 @@ void ScreenSystem::pollEvents() {
 
 void ScreenSystem::onEvent(const Event& event) {
     if (event.type == EventType::EscapePressed) {
-        glfwSetWindowShouldClose(window_, GLFW_TRUE);
+        glfwSetWindowShouldClose(_window, GLFW_TRUE);
     }
 }
 
-void ScreenSystem::render() {
-    renderer_->render();
+void ScreenSystem::render(const Land& land) {
+    if (_camera == nullptr) {
+        throw std::runtime_error("ScreenSystem requires a registered camera");
+    }
+    _renderer->render({.land = &land, .camera = _camera->frame()});
+}
+
+void ScreenSystem::registerCamera(Camera& camera) {
+    _camera = &camera;
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(_window, &width, &height);
+    _camera->setViewport(width, height);
 }
 
 bool ScreenSystem::shouldClose() const {
-    return glfwWindowShouldClose(window_) == GLFW_TRUE;
+    return glfwWindowShouldClose(_window) == GLFW_TRUE;
 }
 
-void ScreenSystem::handleKey(
+void ScreenSystem::_handleKey(
     GLFWwindow* window,
     int key,
     int /* scanCode */,
@@ -96,17 +112,53 @@ void ScreenSystem::handleKey(
         auto* screen = static_cast<ScreenSystem*>(
             glfwGetWindowUserPointer(window)
         );
-        screen->emit({EventType::EscapePressed});
+        screen->_emit({EventType::EscapePressed});
     }
 }
 
-void ScreenSystem::handleWindowClose(GLFWwindow* window) {
+void ScreenSystem::_handleWindowClose(GLFWwindow* window) {
     auto* screen = static_cast<ScreenSystem*>(glfwGetWindowUserPointer(window));
-    screen->emit({EventType::WindowCloseRequested});
+    screen->_emit({EventType::WindowCloseRequested});
 }
 
-void ScreenSystem::emit(Event event) const {
-    if (eventCallback_) {
-        eventCallback_(event);
+void ScreenSystem::_handleCursor(GLFWwindow* window, double x, double y) {
+    auto* screen = static_cast<ScreenSystem*>(glfwGetWindowUserPointer(window));
+    screen->_emit({.type = EventType::MouseMoved, .x = x, .y = y});
+}
+
+void ScreenSystem::_handleMouseButton(
+    GLFWwindow* window,
+    int button,
+    int action,
+    int /* modifiers */
+) {
+    auto* screen = static_cast<ScreenSystem*>(glfwGetWindowUserPointer(window));
+    const EventType type = action == GLFW_PRESS
+        ? EventType::MouseButtonPressed
+        : EventType::MouseButtonReleased;
+    screen->_emit({.type = type, .button = button});
+}
+
+void ScreenSystem::_handleScroll(GLFWwindow* window, double x, double y) {
+    auto* screen = static_cast<ScreenSystem*>(glfwGetWindowUserPointer(window));
+    screen->_emit({.type = EventType::MouseScrolled, .x = x, .y = y});
+}
+
+void ScreenSystem::_handleFramebufferSize(
+    GLFWwindow* window,
+    int width,
+    int height
+) {
+    auto* screen = static_cast<ScreenSystem*>(glfwGetWindowUserPointer(window));
+    screen->_emit({
+        .type = EventType::ViewportResized,
+        .x = static_cast<double>(width),
+        .y = static_cast<double>(height),
+    });
+}
+
+void ScreenSystem::_emit(Event event) const {
+    if (_eventCallback) {
+        _eventCallback(event);
     }
 }

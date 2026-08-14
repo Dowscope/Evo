@@ -21,9 +21,9 @@ public:
     void flush();
 
 private:
-    void load();
+    void _load();
 
-    std::filesystem::path savePath_;
-    std::unordered_map<std::string, std::string> values_;
-    bool dirty_ = false;
+    std::filesystem::path _savePath;
+    std::unordered_map<std::string, std::string> _values;
+    bool _dirty = false;
 };

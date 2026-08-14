@@ -13,9 +13,9 @@ public:
     ~VulkanSystem() override;
 
     void init() override;
-    void render() override;
+    void render(const Scene& scene) override;
 
 private:
-    std::vector<std::string> requiredExtensions_;
-    VkInstance instance_ = VK_NULL_HANDLE;
+    std::vector<std::string> _requiredExtensions;
+    VkInstance _instance = VK_NULL_HANDLE;
 };

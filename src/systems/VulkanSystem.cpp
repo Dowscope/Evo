@@ -7,18 +7,18 @@
 
 VulkanSystem::VulkanSystem(std::vector<std::string> requiredExtensions)
     : RenderSystem("Vulkan"),
-      requiredExtensions_(std::move(requiredExtensions)) {}
+      _requiredExtensions(std::move(requiredExtensions)) {}
 
 VulkanSystem::~VulkanSystem() {
-    if (instance_ != VK_NULL_HANDLE) {
-        vkDestroyInstance(instance_, nullptr);
+    if (_instance != VK_NULL_HANDLE) {
+        vkDestroyInstance(_instance, nullptr);
     }
 }
 
 void VulkanSystem::init() {
     std::vector<const char*> extensions;
-    extensions.reserve(requiredExtensions_.size());
-    for (const std::string& extension : requiredExtensions_) {
+    extensions.reserve(_requiredExtensions.size());
+    for (const std::string& extension : _requiredExtensions) {
         extensions.push_back(extension.c_str());
     }
 
@@ -43,14 +43,14 @@ void VulkanSystem::init() {
         .ppEnabledExtensionNames = extensions.data(),
     };
 
-    if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
+    if (vkCreateInstance(&createInfo, nullptr, &_instance) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create the Vulkan instance");
     }
 
     System::init();
 }
 
-void VulkanSystem::render() {
+void VulkanSystem::render(const Scene& /* scene */) {
     // Rendering commands, swapchain presentation, and Vulkan synchronization
     // remain encapsulated here as the renderer grows.
 }

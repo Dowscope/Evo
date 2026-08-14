@@ -3,6 +3,24 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-13 - Camera and Land Architecture
+
+### Added
+
+- Added `CameraSystem` with framebuffer-sized perspective projection.
+- Added mouse events for orbiting, panning, and scroll-wheel zoom.
+- Added game-owned dirt land geometry submitted through `RenderTarget`.
+- Added scene and camera-frame data passed into the Vulkan rendering boundary.
+
+### Changed
+
+- Routed mouse input exclusively through `EventSystem` listeners.
+- Established `_camelCase` prefixes for all private methods and variables.
+
+### Pending
+
+- Implement the Vulkan swapchain and graphics pipeline that will draw the land.
+
 ## 2026-08-13 - Modular Vulkan Foundation
 
 ### Added

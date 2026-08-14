@@ -13,5 +13,5 @@ public:
     virtual void init();
 
 private:
-    std::string name_;
+    std::string _name;
 };

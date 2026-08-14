@@ -5,14 +5,14 @@
 #include <string>
 #include <utility>
 
-System::System(std::string name) : name_(std::move(name)) {
-    Logger::write('[' + name_ + " System] Starting");
+System::System(std::string name) : _name(std::move(name)) {
+    Logger::write('[' + _name + " System] Starting");
 }
 
 System::~System() {
-    Logger::write('[' + name_ + " System] Shutdown");
+    Logger::write('[' + _name + " System] Shutdown");
 }
 
 void System::init() {
-    Logger::write('[' + name_ + " System] Initialized");
+    Logger::write('[' + _name + " System] Initialized");
 }
