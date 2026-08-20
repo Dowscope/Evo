@@ -3,6 +3,48 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Directional Terrain Shadows
+
+### Added
+
+- Added a 2048 x 2048 Vulkan directional shadow-map pass fitted to current land
+  bounds and driven by the physical sun direction.
+- Added slope-aware depth bias and 3 x 3 percentage-closer filtering for stable,
+  softened hill shadows.
+- Added a dedicated depth-only shadow vertex shader and explicit shader build
+  rules for both Make and CMake.
+
+### Changed
+
+- Increased procedural terrain base amplitude from 0.55 to 0.68 for more visible
+  rolling hills without introducing mountain-scale relief.
+- Changed direct terrain lighting to respect visual hill occlusion while keeping
+  ambient sky illumination and temperature-overlay presentation intact.
+
+### Known limitation
+
+- Shadow mapping is presentation-only; terrain occlusion does not yet reduce
+  authoritative ECS solar heating.
+
+## 2026-08-20 - Dynamic Atmosphere
+
+### Added
+
+- Added `AtmosphereSystem` and narrow simulation/statistics interfaces as the
+  foundation for future humidity, wind, clouds, and precipitation.
+- Added configurable daily minimum and maximum air temperatures, their local
+  hours, and an effective clear-sky temperature offset.
+- Added live air and effective sky temperatures to the in-window stats panel.
+
+### Changed
+
+- Replaced fixed air and sky temperatures with smooth half-cosine warming and
+  cooling phases driven by shared simulation-day progress.
+- Routed current atmospheric state through `GameSystem` into fixed-tick surface
+  energy simulation without making the coordinator own atmospheric behavior.
+- Aligned solar phase to conventional local time so the configured 06:00 air
+  minimum follows the night and the 15:00 maximum follows solar noon.
+
 ## 2026-08-20 - Solar Surface Temperature
 
 ### Added

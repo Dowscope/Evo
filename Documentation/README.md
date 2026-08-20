@@ -42,6 +42,8 @@ It passes beneath the world during the nightward half of its cycle. Its
 direction illuminates exposed terrain faces, while its height controls daylight
 intensity and transitions the sky between bright blue and deep night blue. The
 same sun state drives cell-level surface heating.
+The orbit follows conventional simulation-local time: midnight at 00:00,
+sunrise near 06:00, solar noon at 12:00, and sunset near 18:00.
 
 ### Configuration
 
@@ -62,13 +64,17 @@ Edit `config/config.json` before starting EVO to change startup settings:
   "time.fixed_step_seconds": 60.0,
   "time.scale": 1440.0,
   "time.day_length_seconds": 86400.0,
-  "climate.air_temperature_celsius": 15.0,
+  "climate.initial_surface_temperature_celsius": 15.0,
   "climate.solar_irradiance_w_m2": 1000.0,
   "climate.surface_absorptivity": 0.75,
   "climate.surface_heat_capacity_j_m2_k": 200000.0,
   "climate.surface_heat_transfer_w_m2_k": 10.0,
   "climate.surface_emissivity": 0.95,
-  "climate.effective_sky_temperature_celsius": -5.0,
+  "atmosphere.minimum_air_temperature_celsius": 10.0,
+  "atmosphere.maximum_air_temperature_celsius": 22.0,
+  "atmosphere.minimum_temperature_hour": 6.0,
+  "atmosphere.maximum_temperature_hour": 15.0,
+  "atmosphere.clear_sky_temperature_offset_celsius": -20.0,
   "soil.initial_temperature_celsius": 15.0,
   "soil.deep_ground_temperature_celsius": 12.0,
   "soil.thermal_conductivity_w_m_k": 1.0,
@@ -113,6 +119,12 @@ meter per kelvin. Absorptivity is dimensionless from zero through one.
 Surface emissivity is also dimensionless from zero through one. Effective sky
 temperature represents incoming atmospheric infrared radiation as an equivalent
 blackbody temperature; it is not the local air temperature.
+
+Atmospheric minimum and maximum temperatures are degrees Celsius. Their hours
+use simulation-local time from 0 through 24 and must place the minimum before
+the maximum. The clear-sky offset is added to current air temperature to derive
+effective sky temperature. Defaults produce 10 °C air at 06:00, 22 °C at
+15:00, and a sky equivalent 20 °C colder than the air.
 
 ### Saved progress
 
@@ -205,8 +217,9 @@ be selected by `ScreenSystem`; no changes should be required in `GameSystem`,
 
 `TerrainGenerationSystem` creates the dirt land as a configurable procedural
 grid. Four octaves of seeded, smoothly interpolated value noise produce
-deterministic large landforms and smaller surface variation. It creates each
-terrain entity and initializes its position, elevation, slope, aspect, and
+deterministic rolling hills and smaller surface variation. The modestly stronger
+base amplitude exposes light and shadow without producing mountains. It creates
+each terrain entity and initializes its position, elevation, slope, aspect, and
 drainage component slots.
 
 `TerrainMeshSystem` converts ECS elevation into the visible surface. Subtle
@@ -275,8 +288,8 @@ and application phases.
 ### Surface temperature
 
 Every terrain entity has `SurfaceTemperature::celsius`, initialized from the
-configured air temperature. `SurfaceTemperatureSystem` runs after terrain
-analysis on every fixed tick. It reconstructs an upward surface normal from
+configured initial surface temperature. `SurfaceTemperatureSystem` runs after
+terrain analysis on every fixed tick. It reconstructs an upward surface normal from
 slope and aspect, then calculates solar incidence as the nonnegative dot product
 between that normal and the direction to the sun.
 
@@ -338,9 +351,14 @@ differences.
 This is still a deliberately limited energy balance. Its four bands are thermal
 depth cells, not geological horizons with distinct composition, and the fixed
 deep boundary is an explicit approximation. It does not yet include terrain
-shadows, soil moisture and latent heat, cloud-dependent sky temperature,
-wind-dependent convection, or changing air temperature. Those effects must be
-added explicitly rather than hidden in arbitrary offsets.
+shadow occlusion in the thermal calculation, soil moisture and latent heat,
+cloud-dependent sky temperature, or wind-dependent convection. Those effects
+must be added explicitly rather than hidden in arbitrary offsets.
+
+Directional shadows are currently presentation-only. The GPU shadow map does
+not feed ECS temperature because render data is not authoritative simulation
+state. Thermal terrain shading will require a deterministic CPU-side horizon or
+ray-occlusion calculation using ECS elevation.
 
 Temperature is averaged from adjacent cells into terrain mesh vertices. Pressing
 T toggles a shader overlay with a fixed visual range from -10 °C (blue) through
@@ -352,6 +370,26 @@ temperature of every cell across every chunk and divides by the total cell
 count. `ScreenSystem` reads that value through the narrow
 `SurfaceTemperatureStatistics` interface. `ScreenSystem` renders the value in
 the stats window each frame; display rounding does not alter ECS values.
+
+### Atmosphere
+
+`AtmosphereSystem` owns the current `AtmosphereState`. It uses normalized day
+progress from `TimeSystem` and smooth half-cosine transitions: air warms from
+the configured morning minimum to the afternoon maximum, then cools through
+midnight toward the next minimum. This avoids discontinuities at extrema and at
+the day boundary.
+
+`GameSystem` advances the atmosphere after the sun and before chunk simulation.
+It passes the resulting state through `SurfaceTemperatureSimulation`, so every
+fixed surface-energy tick uses current air and effective sky temperatures.
+`ScreenSystem` reads the same state through the read-only
+`AtmosphereStatistics` interface and displays both values inside the stats
+window.
+
+The current atmosphere is spatially uniform and deterministic. Its dedicated
+state and system boundary are intended to accept humidity, pressure, wind,
+cloud water, and precipitation later; none of those are implied by the present
+temperature cycle.
 
 ### Time architecture
 
@@ -386,7 +424,11 @@ vertex shader each frame through a push constant. Per-draw model transforms let
 the renderer draw the stationary land and moving sun through the same pipeline.
 Sun position and intensity are included in that draw state. The fragment shader
 derives face normals, applies ambient and diffuse sunlight to terrain, and keeps
-the sun emissive so it remains bright at night.
+the sun emissive so it remains bright at night. Before the camera pass, Vulkan
+renders terrain depth from the directional sun into a 2048 x 2048 orthographic
+shadow map fitted to current land bounds. Slope-aware bias and 3 x 3
+percentage-closer filtering soften artifacts and edges. Occlusion removes direct
+sunlight but retains ambient sky illumination.
 
 Shader sources live under `shaders/`. Both CMake and Make compile them to SPIR-V
 with `glslc`, so the Vulkan SDK shader compiler is required at build time.

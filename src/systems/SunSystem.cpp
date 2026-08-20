@@ -18,7 +18,7 @@ void SunSystem::updateSun(Sun& sun, const TimeFrame& time) {
     ) * _config.cellSizeMeters;
     const float orbitRadius = worldWidth * 0.75F;
     const float sunAngle = static_cast<float>(time.dayProgress) *
-                           2.0F * glm::pi<float>();
+                           2.0F * glm::pi<float>() - glm::half_pi<float>();
     sun.direction = glm::normalize(glm::vec3{
         std::cos(sunAngle),
         std::sin(sunAngle),

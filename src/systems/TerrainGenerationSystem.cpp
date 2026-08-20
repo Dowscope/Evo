@@ -58,7 +58,7 @@ void TerrainGenerationSystem::generateTerrain(
                     registry.emplace<Aspect>(entity);
                     registry.emplace<Drainage>(entity);
                     registry.emplace<SurfaceTemperature>(
-                        entity, _climateConfig.airTemperatureCelsius
+                        entity, _climateConfig.initialSurfaceTemperatureCelsius
                     );
                     registry.emplace<SoilTemperatureProfile>(
                         entity,
@@ -112,7 +112,7 @@ float TerrainGenerationSystem::_terrainHeight(
         return std::lerp(nearA, nearB, smoothZ);
     };
     float height = 0.0F;
-    float amplitude = 0.55F;
+    float amplitude = 0.68F;
     float frequency = 0.18F;
     for (std::uint64_t octave = 0; octave < 4; ++octave) {
         height += noise(x * frequency, z * frequency, octave) * amplitude;

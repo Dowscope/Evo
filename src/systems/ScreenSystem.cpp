@@ -3,6 +3,7 @@
 #include "rendering/Camera.hpp"
 #include "systems/VulkanSystem.hpp"
 #include "simulation/SurfaceTemperatureStatistics.hpp"
+#include "simulation/AtmosphereStatistics.hpp"
 #include "time/Clock.hpp"
 
 #include <GLFW/glfw3.h>
@@ -37,6 +38,8 @@ std::array<unsigned char, 7> glyph(char character) {
     case 'E': return {31, 16, 16, 30, 16, 16, 31};
     case 'F': return {31, 16, 16, 30, 16, 16, 16};
     case 'G': return {14, 17, 16, 23, 17, 17, 15};
+    case 'I': return {14, 4, 4, 4, 4, 4, 14};
+    case 'K': return {17, 18, 20, 24, 20, 18, 17};
     case 'L': return {16, 16, 16, 16, 16, 16, 31};
     case 'M': return {17, 27, 21, 21, 17, 17, 17};
     case 'N': return {17, 25, 21, 19, 17, 17, 17};
@@ -119,7 +122,7 @@ void ScreenSystem::init() {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     _statsWindow = glfwCreateWindow(
         420,
-        180,
+        250,
         "EVO Stats",
         nullptr,
         nullptr
@@ -206,6 +209,12 @@ void ScreenSystem::registerTemperatureStatistics(
     _temperatureStatistics = &statistics;
 }
 
+void ScreenSystem::registerAtmosphereStatistics(
+    AtmosphereStatistics& statistics
+) {
+    _atmosphereStatistics = &statistics;
+}
+
 bool ScreenSystem::shouldClose() const {
     return glfwWindowShouldClose(_window) == GLFW_TRUE;
 }
@@ -279,6 +288,7 @@ void ScreenSystem::_emit(Event event) const {
 
 void ScreenSystem::_renderStatsWindow() {
     if (_clock == nullptr || _temperatureStatistics == nullptr ||
+        _atmosphereStatistics == nullptr ||
         _statsWindow == nullptr ||
         glfwWindowShouldClose(_statsWindow) == GLFW_TRUE) {
         return;
@@ -306,19 +316,29 @@ void ScreenSystem::_renderStatsWindow() {
     const std::uint64_t day = _clock->frame().day;
     const float averageTemperature =
         _temperatureStatistics->averageSurfaceTemperatureCelsius();
+    const AtmosphereState& atmosphere =
+        _atmosphereStatistics->atmosphere();
     std::ostringstream temperature;
     temperature << "AVG TEMP: " << std::fixed << std::setprecision(1)
                 << averageTemperature << " C";
+    std::ostringstream airTemperature;
+    airTemperature << "AIR TEMP: " << std::fixed << std::setprecision(1)
+                   << atmosphere.airTemperatureCelsius << " C";
+    std::ostringstream skyTemperature;
+    skyTemperature << "SKY TEMP: " << std::fixed << std::setprecision(1)
+                   << atmosphere.effectiveSkyTemperatureCelsius << " C";
 
     glColor3f(0.35F, 0.78F, 1.0F);
     drawText("EVO STATS", 20.0F, 18.0F, 4.0F);
     glColor3f(0.88F, 0.93F, 1.0F);
     drawText("DAY: " + std::to_string(day), 20.0F, 62.0F, 3.0F);
     drawText(temperature.str(), 20.0F, 96.0F, 3.0F);
+    drawText(airTemperature.str(), 20.0F, 130.0F, 3.0F);
+    drawText(skyTemperature.str(), 20.0F, 164.0F, 3.0F);
     drawText(
         _temperatureOverlay ? "OVERLAY: ON" : "OVERLAY: OFF",
         20.0F,
-        130.0F,
+        198.0F,
         3.0F
     );
 

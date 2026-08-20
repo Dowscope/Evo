@@ -136,8 +136,9 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
             config.time.timeScale = parseNumber<double>(value, key);
         } else if (key == "time.day_length_seconds") {
             config.time.dayLengthSeconds = parseNumber<double>(value, key);
-        } else if (key == "climate.air_temperature_celsius") {
-            config.climate.airTemperatureCelsius = parseNumber<float>(value, key);
+        } else if (key == "climate.initial_surface_temperature_celsius") {
+            config.climate.initialSurfaceTemperatureCelsius =
+                parseNumber<float>(value, key);
         } else if (key == "climate.solar_irradiance_w_m2") {
             config.climate.solarIrradianceWattsPerSquareMeter =
                 parseNumber<float>(value, key);
@@ -151,8 +152,20 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
                 parseNumber<float>(value, key);
         } else if (key == "climate.surface_emissivity") {
             config.climate.surfaceEmissivity = parseNumber<float>(value, key);
-        } else if (key == "climate.effective_sky_temperature_celsius") {
-            config.climate.effectiveSkyTemperatureCelsius =
+        } else if (key == "atmosphere.minimum_air_temperature_celsius") {
+            config.atmosphere.minimumAirTemperatureCelsius =
+                parseNumber<float>(value, key);
+        } else if (key == "atmosphere.maximum_air_temperature_celsius") {
+            config.atmosphere.maximumAirTemperatureCelsius =
+                parseNumber<float>(value, key);
+        } else if (key == "atmosphere.minimum_temperature_hour") {
+            config.atmosphere.minimumTemperatureHour =
+                parseNumber<float>(value, key);
+        } else if (key == "atmosphere.maximum_temperature_hour") {
+            config.atmosphere.maximumTemperatureHour =
+                parseNumber<float>(value, key);
+        } else if (key == "atmosphere.clear_sky_temperature_offset_celsius") {
+            config.atmosphere.clearSkyTemperatureOffsetCelsius =
                 parseNumber<float>(value, key);
         } else if (key == "soil.initial_temperature_celsius") {
             config.soil.initialTemperatureCelsius =
@@ -220,11 +233,11 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
         config.time.dayLengthSeconds <= 0.0) {
         throw std::runtime_error("time.day_length_seconds must be positive");
     }
-    if (!std::isfinite(config.climate.airTemperatureCelsius) ||
-        config.climate.airTemperatureCelsius < -100.0F ||
-        config.climate.airTemperatureCelsius > 100.0F) {
+    if (!std::isfinite(config.climate.initialSurfaceTemperatureCelsius) ||
+        config.climate.initialSurfaceTemperatureCelsius < -100.0F ||
+        config.climate.initialSurfaceTemperatureCelsius > 100.0F) {
         throw std::runtime_error(
-            "climate.air_temperature_celsius must be between -100 and 100"
+            "climate.initial_surface_temperature_celsius must be between -100 and 100"
         );
     }
     if (!std::isfinite(config.climate.solarIrradianceWattsPerSquareMeter) ||
@@ -262,11 +275,33 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
             "climate.surface_emissivity must be between 0 and 1"
         );
     }
-    if (!std::isfinite(config.climate.effectiveSkyTemperatureCelsius) ||
-        config.climate.effectiveSkyTemperatureCelsius <= -273.15F ||
-        config.climate.effectiveSkyTemperatureCelsius > 100.0F) {
+    if (!std::isfinite(config.atmosphere.minimumAirTemperatureCelsius) ||
+        !std::isfinite(config.atmosphere.maximumAirTemperatureCelsius) ||
+        config.atmosphere.minimumAirTemperatureCelsius < -100.0F ||
+        config.atmosphere.maximumAirTemperatureCelsius > 100.0F ||
+        config.atmosphere.minimumAirTemperatureCelsius >=
+            config.atmosphere.maximumAirTemperatureCelsius) {
         throw std::runtime_error(
-            "climate.effective_sky_temperature_celsius must be above absolute zero and at most 100"
+            "atmosphere air temperatures must be ordered between -100 and 100"
+        );
+    }
+    if (!std::isfinite(config.atmosphere.minimumTemperatureHour) ||
+        !std::isfinite(config.atmosphere.maximumTemperatureHour) ||
+        config.atmosphere.minimumTemperatureHour < 0.0F ||
+        config.atmosphere.minimumTemperatureHour >= 24.0F ||
+        config.atmosphere.maximumTemperatureHour < 0.0F ||
+        config.atmosphere.maximumTemperatureHour >= 24.0F ||
+        config.atmosphere.minimumTemperatureHour >=
+            config.atmosphere.maximumTemperatureHour) {
+        throw std::runtime_error(
+            "atmosphere temperature hours must be ordered within [0, 24)"
+        );
+    }
+    if (!std::isfinite(config.atmosphere.clearSkyTemperatureOffsetCelsius) ||
+        config.atmosphere.minimumAirTemperatureCelsius +
+            config.atmosphere.clearSkyTemperatureOffsetCelsius <= -273.15F) {
+        throw std::runtime_error(
+            "atmosphere clear-sky temperature must remain above absolute zero"
         );
     }
     if (!std::isfinite(config.soil.initialTemperatureCelsius) ||

@@ -9,7 +9,7 @@ find_program(GLSLC glslc REQUIRED)
 
 set(SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
 set(SHADER_OUTPUTS)
-foreach(SHADER land.vert land.frag)
+foreach(SHADER land.vert land.frag shadow.vert)
     set(SHADER_OUTPUT "${SHADER_OUTPUT_DIR}/${SHADER}.spv")
     add_custom_command(
         OUTPUT "${SHADER_OUTPUT}"
@@ -26,6 +26,7 @@ add_executable(EVO
     src/main.cpp
     src/core/ApplicationConfig.cpp
     src/core/Logger.cpp
+    src/systems/AtmosphereSystem.cpp
     src/systems/CameraSystem.cpp
     src/systems/ChunkSimulationSystem.cpp
     src/systems/EventSystem.cpp

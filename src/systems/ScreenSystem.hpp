@@ -12,6 +12,7 @@ class RenderSystem;
 class Camera;
 class Clock;
 class SurfaceTemperatureStatistics;
+class AtmosphereStatistics;
 struct GLFWwindow;
 
 class RenderTarget {
@@ -38,6 +39,7 @@ public:
     void registerTemperatureStatistics(
         SurfaceTemperatureStatistics& statistics
     );
+    void registerAtmosphereStatistics(AtmosphereStatistics& statistics);
 
     [[nodiscard]] bool shouldClose() const;
 
@@ -71,5 +73,6 @@ private:
     Camera* _camera = nullptr;
     Clock* _clock = nullptr;
     SurfaceTemperatureStatistics* _temperatureStatistics = nullptr;
+    AtmosphereStatistics* _atmosphereStatistics = nullptr;
     bool _temperatureOverlay = false;
 };

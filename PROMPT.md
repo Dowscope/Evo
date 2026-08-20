@@ -38,11 +38,12 @@ user/programmer manual in `Documentation` when relevant.
   use physical seconds: a 60-second tick and an 86400-second day, accelerated by
   a time scale of 1440.
 - Air temperature, solar irradiance, surface absorptivity, areal heat capacity,
-  surface heat-transfer coefficient, emissivity, and effective sky temperature
-  belong to `ClimateConfig`. Soil initial and deep temperatures, conductivity,
-  volumetric heat capacity, surface conductance, layer thicknesses, and
-  deep-boundary depth belong to `SoilThermalConfig`. Preserve their documented
-  units and validation when extending the energy model.
+  surface heat-transfer coefficient and emissivity belong to `ClimateConfig`.
+  Daily air-temperature extrema and hours plus clear-sky temperature offset
+  belong to `AtmosphereConfig`. Soil initial and deep temperatures,
+  conductivity, volumetric heat capacity, surface conductance, layer
+  thicknesses, and deep-boundary depth belong to `SoilThermalConfig`. Preserve
+  their documented units and validation when extending the energy model.
 - A configured world seed of `0` requests a fresh random nonzero seed. Resolve it
   in `GameSystem` before terrain generation, log it, and immediately checkpoint
   it as `world.last_seed`. Do not rewrite the read-only startup configuration.
@@ -110,9 +111,10 @@ this order so every consumer observes the current frame's timing snapshot.
 - `ScreenSystem` is the only top-level system responsible for window creation
   and anything presented to the screen.
 - `ScreenSystem` owns both the main game window and the compact stats window.
-  The stats window renders the current day, average surface temperature, and
-  overlay state in its content area and receives timing only through an
-  explicitly registered `Clock` interface.
+  The stats window renders the current day, average surface temperature,
+  atmospheric air and sky temperatures, and overlay state in its content area.
+  It receives timing and statistics only through explicitly registered narrow
+  interfaces.
 - `ScreenSystem` alone declares, owns, initializes, and accesses the rendering
   backend.
 - The main scene remains Vulkan-rendered. The auxiliary stats presentation may
@@ -122,9 +124,13 @@ this order so every consumer observes the current frame's timing snapshot.
   No other system may include Vulkan headers.
 - `VulkanSystem` owns the surface, device and presentation selection, swapchain,
   depth resources, graphics pipeline, GPU buffers, command recording, and frame
-  synchronization. It uses Vulkan 1.3 dynamic rendering.
+  synchronization. It uses Vulkan 1.3 dynamic rendering. Its directional shadow
+  pass owns the sampled depth image, light-space pipeline, descriptors, and
+  filtering state.
 - GLSL shader sources live in `shaders/` and are compiled to SPIR-V by both
   supported build systems. Keep shader compilation as an explicit build step.
+  The 2048 x 2048 terrain shadow map uses an orthographic light camera fitted to
+  land bounds, slope-aware bias, and 3 x 3 percentage-closer filtering.
 - Rendering backends implement the `RenderSystem` interface. A future
   backend such as `DirectXSystem` should be selectable inside `ScreenSystem`
   without requiring changes to the game, event system, or main loop.
@@ -170,10 +176,18 @@ this order so every consumer observes the current frame's timing snapshot.
 - The sun is game-world state coordinated by `GameSystem` and advanced through
   the registered `SunSimulation` interface implemented by `SunSystem`, then
   submitted through `Scene`. Rendering code must not own orbit simulation.
+- `AtmosphereSystem` owns `AtmosphereState` and derives its smooth daily cycle
+  only from the shared `TimeFrame`. `GameSystem` advances it before fixed chunk
+  simulation and passes it to temperature simulation through narrow interfaces.
+  Keep future humidity, pressure, wind, clouds, and precipitation in atmosphere
+  state or focused atmospheric systems rather than `GameSystem`.
 - `SunSystem` derives sun position and intensity from normalized day progress
   and world dimensions. The renderer consumes those values for directional
   terrain lighting and the day/night sky transition; it must not independently
   calculate world time.
+- Solar phase follows conventional local time: midnight at 00:00, sunrise near
+  06:00, noon at 12:00, and sunset near 18:00. Atmospheric extrema use the same
+  local-time frame.
 - `Sun::position` places the visible representation near the modeled world;
   `Sun::direction` represents effectively parallel physical solar rays. Lighting
   and thermal systems use direction, never distance to the display mesh.
@@ -199,6 +213,9 @@ this order so every consumer observes the current frame's timing snapshot.
   Chunk layout and cell size may change through `WorldConfig`.
 - Terrain rendering is derived from ECS cell elevation. Render vertices are not
   authoritative simulation state.
+- Vulkan directional shadows affect presentation only. Do not sample or copy
+  the GPU shadow map back into ECS temperature. Physical terrain occlusion must
+  be implemented deterministically from authoritative elevation data.
 - `TerrainAnalysisSystem` derives slope in degrees, aspect in radians, and D8
   steepest-descent drainage. Flat terrain has undefined aspect; do not invent a
   direction. A null downhill neighbor means no lower cell exists inside the

@@ -31,13 +31,20 @@ struct TimeConfig {
 };
 
 struct ClimateConfig {
-    float airTemperatureCelsius = 15.0F;
+    float initialSurfaceTemperatureCelsius = 15.0F;
     float solarIrradianceWattsPerSquareMeter = 1000.0F;
     float surfaceAbsorptivity = 0.75F;
     float surfaceHeatCapacityJoulesPerSquareMeterKelvin = 200000.0F;
     float surfaceHeatTransferWattsPerSquareMeterKelvin = 10.0F;
     float surfaceEmissivity = 0.95F;
-    float effectiveSkyTemperatureCelsius = -5.0F;
+};
+
+struct AtmosphereConfig {
+    float minimumAirTemperatureCelsius = 10.0F;
+    float maximumAirTemperatureCelsius = 22.0F;
+    float minimumTemperatureHour = 6.0F;
+    float maximumTemperatureHour = 15.0F;
+    float clearSkyTemperatureOffsetCelsius = -20.0F;
 };
 
 struct SoilThermalConfig {
@@ -56,6 +63,7 @@ struct ApplicationConfig {
     WorldConfig world;
     TimeConfig time;
     ClimateConfig climate;
+    AtmosphereConfig atmosphere;
     SoilThermalConfig soil;
 };
 

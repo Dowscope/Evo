@@ -8,6 +8,11 @@ layout(location = 0) out vec3 color;
 layout(location = 1) out vec3 worldPosition;
 layout(location = 2) flat out float emissive;
 layout(location = 3) out float surfaceTemperature;
+layout(location = 4) out vec4 shadowPosition;
+
+layout(set = 0, binding = 1) uniform ShadowState {
+    mat4 lightViewProjection;
+} shadowState;
 
 layout(push_constant) uniform DrawState {
     mat4 viewProjection;
@@ -22,4 +27,5 @@ void main() {
     color = inColor;
     emissive = drawState.modelTranslation.w;
     surfaceTemperature = inSurfaceTemperature;
+    shadowPosition = shadowState.lightViewProjection * vec4(worldPosition, 1.0);
 }

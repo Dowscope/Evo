@@ -5,7 +5,7 @@ LDLIBS ?= $(shell pkg-config --libs glfw3 vulkan gl)
 
 TARGET := EVO
 SOURCES := $(shell find src -name '*.cpp' -print)
-SHADERS := shaders/land.vert.spv shaders/land.frag.spv
+SHADERS := shaders/land.vert.spv shaders/land.frag.spv shaders/shadow.vert.spv
 CPPFLAGS += -Isrc
 
 .PHONY: all run clean

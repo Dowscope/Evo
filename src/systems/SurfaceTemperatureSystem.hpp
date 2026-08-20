@@ -18,6 +18,7 @@ public:
 
     void init() override;
     void setSunState(const Sun& sun) override;
+    void setAtmosphereState(const AtmosphereState& atmosphere) override;
     [[nodiscard]] float averageSurfaceTemperatureCelsius() const override;
     void updateChunk(
         Registry& registry,
@@ -38,5 +39,6 @@ private:
     ClimateConfig _climateConfig;
     SoilThermalConfig _soilConfig;
     Sun _sun;
+    AtmosphereState _atmosphere;
     float _averageSurfaceTemperatureCelsius = 15.0F;
 };

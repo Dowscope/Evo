@@ -4,6 +4,9 @@
 
 #include <vulkan/vulkan.h>
 
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+
 #include <string>
 #include <vector>
 
@@ -29,6 +32,9 @@ private:
     void _createSwapchain();
     void _destroySwapchain();
     void _createPipeline();
+    void _createShadowResources();
+    void _createShadowDescriptors();
+    void _destroyShadowResources();
     void _createCommands();
     void _createSyncObjects();
     void _recreateSwapchain();
@@ -43,6 +49,7 @@ private:
         VkMemoryPropertyFlags properties
     ) const;
     [[nodiscard]] VkShaderModule _loadShader(const std::string& path) const;
+    [[nodiscard]] glm::mat4 _lightViewProjection(const Sun& sun) const;
 
     GLFWwindow* _window;
     std::vector<std::string> _requiredExtensions;
@@ -63,6 +70,18 @@ private:
     VkImageView _depthView = VK_NULL_HANDLE;
     VkPipelineLayout _pipelineLayout = VK_NULL_HANDLE;
     VkPipeline _pipeline = VK_NULL_HANDLE;
+    static constexpr std::uint32_t shadowMapSize = 2048;
+    VkImage _shadowImage = VK_NULL_HANDLE;
+    VkDeviceMemory _shadowMemory = VK_NULL_HANDLE;
+    VkImageView _shadowView = VK_NULL_HANDLE;
+    VkSampler _shadowSampler = VK_NULL_HANDLE;
+    VkDescriptorSetLayout _shadowDescriptorLayout = VK_NULL_HANDLE;
+    VkDescriptorPool _shadowDescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet _shadowDescriptorSet = VK_NULL_HANDLE;
+    VkPipelineLayout _shadowPipelineLayout = VK_NULL_HANDLE;
+    VkPipeline _shadowPipeline = VK_NULL_HANDLE;
+    Buffer _shadowUniformBuffer;
+    bool _shadowMapInitialized = false;
     VkCommandPool _commandPool = VK_NULL_HANDLE;
     VkCommandBuffer _commandBuffer = VK_NULL_HANDLE;
     VkSemaphore _imageAvailable = VK_NULL_HANDLE;
@@ -72,6 +91,8 @@ private:
     Buffer _indexBuffer;
     std::uint32_t _indexCount = 0;
     std::uint64_t _landRevision = 0;
+    glm::vec3 _landCenter{0.0F};
+    float _landRadius = 1.0F;
     Buffer _sunVertexBuffer;
     Buffer _sunIndexBuffer;
     std::uint32_t _sunIndexCount = 0;

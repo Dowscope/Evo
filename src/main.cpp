@@ -12,6 +12,7 @@
 #include "systems/TerrainGenerationSystem.hpp"
 #include "systems/TerrainMeshSystem.hpp"
 #include "systems/SurfaceTemperatureSystem.hpp"
+#include "systems/AtmosphereSystem.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -23,6 +24,7 @@ std::unique_ptr<EventSystem> eventSystem;
 std::unique_ptr<TimeSystem> timeSystem;
 std::unique_ptr<ChunkSimulationSystem> chunkSimulationSystem;
 std::unique_ptr<SunSystem> sunSystem;
+std::unique_ptr<AtmosphereSystem> atmosphereSystem;
 std::unique_ptr<TerrainAnalysisSystem> terrainAnalysisSystem;
 std::unique_ptr<TerrainGenerationSystem> terrainGenerationSystem;
 std::unique_ptr<TerrainMeshSystem> terrainMeshSystem;
@@ -39,6 +41,7 @@ void init() {
     timeSystem = std::make_unique<TimeSystem>(config.time);
     chunkSimulationSystem = std::make_unique<ChunkSimulationSystem>();
     sunSystem = std::make_unique<SunSystem>(config.world);
+    atmosphereSystem = std::make_unique<AtmosphereSystem>(config.atmosphere);
     terrainAnalysisSystem = std::make_unique<TerrainAnalysisSystem>(config.world);
     terrainGenerationSystem = std::make_unique<TerrainGenerationSystem>(
         config.climate,
@@ -58,6 +61,7 @@ void init() {
     timeSystem->init();
     chunkSimulationSystem->init();
     sunSystem->init();
+    atmosphereSystem->init();
     terrainAnalysisSystem->init();
     terrainGenerationSystem->init();
     terrainMeshSystem->init();
@@ -72,6 +76,7 @@ void init() {
     screenSystem->registerCamera(*cameraSystem);
     screenSystem->registerClock(*timeSystem);
     screenSystem->registerTemperatureStatistics(*surfaceTemperatureSystem);
+    screenSystem->registerAtmosphereStatistics(*atmosphereSystem);
     chunkSimulationSystem->registerTickSystem(*terrainAnalysisSystem);
     chunkSimulationSystem->registerTickSystem(*surfaceTemperatureSystem);
     gameSystem->registerRenderTarget(*screenSystem);
@@ -79,6 +84,7 @@ void init() {
     gameSystem->registerClock(*timeSystem);
     gameSystem->registerChunkSimulation(*chunkSimulationSystem);
     gameSystem->registerSunSimulation(*sunSystem);
+    gameSystem->registerAtmosphereSimulation(*atmosphereSystem);
     gameSystem->registerTerrainGeneration(*terrainGenerationSystem);
     gameSystem->registerTerrainMeshing(*terrainMeshSystem);
     gameSystem->registerSurfaceTemperature(*surfaceTemperatureSystem);
@@ -113,6 +119,7 @@ void shutdown() {
     terrainGenerationSystem.reset();
     terrainAnalysisSystem.reset();
     sunSystem.reset();
+    atmosphereSystem.reset();
     chunkSimulationSystem.reset();
     cameraSystem.reset();
     saveSystem.reset();

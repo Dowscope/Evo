@@ -18,6 +18,7 @@ class SunSimulation;
 class TerrainGeneration;
 class TerrainMeshing;
 class SurfaceTemperatureSimulation;
+class AtmosphereSimulation;
 
 class GameSystem final : public System {
 public:
@@ -35,6 +36,7 @@ public:
     void registerSurfaceTemperature(
         SurfaceTemperatureSimulation& surfaceTemperature
     );
+    void registerAtmosphereSimulation(AtmosphereSimulation& atmosphere);
     void update();
     void render();
 
@@ -50,6 +52,7 @@ private:
     TerrainGeneration* _terrainGeneration = nullptr;
     TerrainMeshing* _terrainMeshing = nullptr;
     SurfaceTemperatureSimulation* _surfaceTemperature = nullptr;
+    AtmosphereSimulation* _atmosphere = nullptr;
     WorldConfig _config;
     Registry _registry;
     std::vector<Chunk> _chunks;

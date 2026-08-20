@@ -31,6 +31,12 @@ void SurfaceTemperatureSystem::setSunState(const Sun& sun) {
     _sun = sun;
 }
 
+void SurfaceTemperatureSystem::setAtmosphereState(
+    const AtmosphereState& atmosphere
+) {
+    _atmosphere = atmosphere;
+}
+
 float SurfaceTemperatureSystem::averageSurfaceTemperatureCelsius() const {
     return _averageSurfaceTemperatureCelsius;
 }
@@ -61,10 +67,10 @@ void SurfaceTemperatureSystem::updateChunk(
         SurfaceTemperature& temperature = registry.get<SurfaceTemperature>(entity);
         const float sensibleHeatLossWattsPerSquareMeter =
             _climateConfig.surfaceHeatTransferWattsPerSquareMeterKelvin *
-            (temperature.celsius - _climateConfig.airTemperatureCelsius);
+            (temperature.celsius - _atmosphere.airTemperatureCelsius);
         const float surfaceKelvin = temperature.celsius + kelvinOffset;
         const float skyKelvin =
-            _climateConfig.effectiveSkyTemperatureCelsius + kelvinOffset;
+            _atmosphere.effectiveSkyTemperatureCelsius + kelvinOffset;
         const float longwaveHeatLossWattsPerSquareMeter =
             _climateConfig.surfaceEmissivity *
             stefanBoltzmannWattsPerSquareMeterKelvinFourth *
