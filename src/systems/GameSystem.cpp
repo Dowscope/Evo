@@ -64,12 +64,48 @@ void GameSystem::_saveState() {
 
 void GameSystem::_createLand() {
     constexpr float size = 5.0F;
-    constexpr glm::vec3 dirt{0.38F, 0.20F, 0.08F};
+    constexpr float depth = 1.0F;
+    constexpr glm::vec3 topDirt{0.42F, 0.23F, 0.09F};
+    constexpr glm::vec3 sideDirt{0.28F, 0.13F, 0.045F};
+    constexpr glm::vec3 bottomDirt{0.20F, 0.085F, 0.025F};
     _land.vertices = {
-        {{-size, 0.0F, -size}, dirt},
-        {{ size, 0.0F, -size}, dirt},
-        {{ size, 0.0F,  size}, dirt},
-        {{-size, 0.0F,  size}, dirt},
+        // Top
+        {{-size, 0.0F, -size}, topDirt},
+        {{ size, 0.0F, -size}, topDirt},
+        {{ size, 0.0F,  size}, topDirt},
+        {{-size, 0.0F,  size}, topDirt},
+        // Front
+        {{-size, 0.0F,  size}, sideDirt},
+        {{ size, 0.0F,  size}, sideDirt},
+        {{ size, -depth, size}, sideDirt},
+        {{-size, -depth, size}, sideDirt},
+        // Back
+        {{ size, 0.0F, -size}, sideDirt},
+        {{-size, 0.0F, -size}, sideDirt},
+        {{-size, -depth, -size}, sideDirt},
+        {{ size, -depth, -size}, sideDirt},
+        // Left
+        {{-size, 0.0F, -size}, sideDirt},
+        {{-size, 0.0F,  size}, sideDirt},
+        {{-size, -depth, size}, sideDirt},
+        {{-size, -depth, -size}, sideDirt},
+        // Right
+        {{ size, 0.0F,  size}, sideDirt},
+        {{ size, 0.0F, -size}, sideDirt},
+        {{ size, -depth, -size}, sideDirt},
+        {{ size, -depth, size}, sideDirt},
+        // Bottom
+        {{-size, -depth, size}, bottomDirt},
+        {{ size, -depth, size}, bottomDirt},
+        {{ size, -depth, -size}, bottomDirt},
+        {{-size, -depth, -size}, bottomDirt},
     };
-    _land.indices = {0, 1, 2, 2, 3, 0};
+    _land.indices = {
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+        8, 9, 10, 10, 11, 8,
+        12, 13, 14, 14, 15, 12,
+        16, 17, 18, 18, 19, 16,
+        20, 21, 22, 22, 23, 20,
+    };
 }

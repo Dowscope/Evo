@@ -11,8 +11,10 @@ created locally under `Data/`.
 
 ## Current rendering status
 
-The camera, event routing, and game-owned dirt land scene are implemented. The
-Vulkan draw pipeline is the next milestone, so the platform is not visible yet.
+The Vulkan renderer draws the game-owned, block-shaped dirt land against a
+sky-blue background.
+It includes a swapchain, depth buffer, graphics pipeline, compiled shaders,
+vertex/index buffers, frame synchronization, and resize recreation.
 
 ## Requirements
 

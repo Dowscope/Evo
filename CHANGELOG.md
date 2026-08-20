@@ -3,6 +3,23 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Visible Land Rendering
+
+### Added
+
+- Added Vulkan surface and graphics-device selection, swapchain presentation,
+  depth buffering, and resize-aware swapchain recreation.
+- Added a dynamic-rendering graphics pipeline, GLSL land shaders, vertex/index
+  buffers, camera push constants, command recording, and frame synchronization.
+- Added shader compilation to the CMake and Make builds.
+
+### Changed
+
+- The existing game-owned dirt platform is now drawn against a blue background.
+- Brightened the background to a natural sky-blue color.
+- Gave the land visible thickness with a lighter top, darker soil sides, and a
+  bottom face, preparing the world mesh for future underground layers.
+
 ## 2026-08-13 - Camera and Land Architecture
 
 ### Added

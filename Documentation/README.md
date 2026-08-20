@@ -18,8 +18,7 @@ to exit.
 
 ### Camera controls
 
-The camera input architecture is implemented. These controls will affect the
-visible scene once the Vulkan drawing pipeline is added:
+Use these controls to inspect the visible land:
 
 - Hold the left mouse button and drag to orbit around the land.
 - Hold the middle mouse button and drag to pan across the land.
@@ -112,14 +111,21 @@ Only `ScreenSystem` owns a `RenderSystem`. The active implementation is
 be selected by `ScreenSystem`; no changes should be required in `GameSystem`,
 `EventSystem`, or the main loop.
 
-`GameSystem` creates the dirt land mesh and submits it as scene data.
+`GameSystem` creates the dirt land as a shallow block with a lighter top and
+darker soil sides, then submits it as scene data. Its thickness leaves room for
+future underground layers without involving the rendering systems.
 `ScreenSystem` combines that data with its registered camera frame, then passes
 the complete scene to `RenderSystem`. This keeps world creation out of the
 screen, camera, and Vulkan layers.
 
-`VulkanSystem` currently accepts this complete scene but only initializes the
-Vulkan instance. Swapchain creation, depth buffering, shaders, and draw commands
-are the next rendering milestone; until then, the dirt platform is not visible.
+`VulkanSystem` presents the scene through a swapchain and Vulkan 1.3 dynamic
+rendering. It owns the graphics pipeline, depth buffer, compiled shaders,
+vertex/index buffers, command recording, synchronization, presentation, and
+swapchain recreation. The camera's view-projection matrix is supplied to the
+vertex shader each frame through a push constant.
+
+Shader sources live under `shaders/`. Both CMake and Make compile them to SPIR-V
+with `glslc`, so the Vulkan SDK shader compiler is required at build time.
 
 ### Naming convention
 

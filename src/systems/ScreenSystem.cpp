@@ -63,7 +63,7 @@ void ScreenSystem::init() {
         extensions.emplace_back(requiredExtensions[index]);
     }
 
-    _renderer = std::make_unique<VulkanSystem>(std::move(extensions));
+    _renderer = std::make_unique<VulkanSystem>(_window, std::move(extensions));
     _renderer->init();
     System::init();
 }

@@ -2,3 +2,4 @@
 /EVO
 /Data/
 *.o
+/shaders/*.spv

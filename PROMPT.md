@@ -74,6 +74,11 @@ or graphics implementation details directly in `main.cpp`.
   backend.
 - All Vulkan types, calls, and lifetime management belong in `VulkanSystem`.
   No other system may include Vulkan headers.
+- `VulkanSystem` owns the surface, device and presentation selection, swapchain,
+  depth resources, graphics pipeline, GPU buffers, command recording, and frame
+  synchronization. It uses Vulkan 1.3 dynamic rendering.
+- GLSL shader sources live in `shaders/` and are compiled to SPIR-V by both
+  supported build systems. Keep shader compilation as an explicit build step.
 - Rendering backends implement the `RenderSystem` interface. A future
   backend such as `DirectXSystem` should be selectable inside `ScreenSystem`
   without requiring changes to the game, event system, or main loop.
