@@ -141,12 +141,13 @@ this order so every consumer observes the current frame's timing snapshot.
 - `GameSystem` coordinates registered simulation interfaces and owns current
   world state; specialized behavior belongs in focused systems rather than
   accumulating inside the coordinator.
-- Land and other game-world objects are created and owned by `GameSystem`, then
-  submitted as scene data through its registered render target.
-- The current land is a configurable deterministic procedural grid built from
-  layered seeded value noise, with rolling elevation, perimeter soil walls, and
-  a bottom face. Terrain generation remains game logic; rendering systems
-  receive completed geometry and must not generate or reshape the world.
+- Land and other current game-world data are owned by `GameSystem`, created and
+  transformed through registered terrain interfaces, then submitted as scene
+  data through its registered render target.
+- `TerrainGenerationSystem` creates the configurable deterministic grid and ECS
+  components from layered seeded value noise. `TerrainMeshSystem` derives the
+  rolling surface, perimeter walls, and bottom render geometry. Vulkan receives
+  completed geometry and must not generate or reshape the world.
 - A render target is explicitly registered with `GameSystem`; currently this is
   the `ScreenSystem` through the `RenderTarget` interface.
 - `GameSystem` must not know how the window or graphics backend is implemented.
@@ -167,14 +168,22 @@ this order so every consumer observes the current frame's timing snapshot.
 - The ECS `Registry` stores each component type in a packed array with entity
   lookup. Do not add behavior, inheritance, or rendering calls to components.
 - Every terrain cell is an entity with `GridPosition`, `ChunkPosition`, and
-  meter-valued `Elevation`. Add environmental components only after their units,
-  inputs, and update model are defined; do not seed arbitrary biological stats.
+  meter-valued `Elevation`, plus derived `Slope`, `Aspect`, and `Drainage`
+  components. Add environmental components only after their units, inputs, and
+  update model are defined; do not seed arbitrary biological stats.
 - The world is partitioned into configurable square chunks. Each chunk owns the
   IDs of its terrain cells and scheduling metadata, not duplicate cell state.
 - The default world is a 2 x 2 layout of 16 x 16 chunks using one-meter cells.
   Chunk layout and cell size may change through `WorldConfig`.
 - Terrain rendering is derived from ECS cell elevation. Render vertices are not
   authoritative simulation state.
+- `TerrainAnalysisSystem` derives slope in degrees, aspect in radians, and D8
+  steepest-descent drainage. Flat terrain has undefined aspect; do not invent a
+  direction. A null downhill neighbor means no lower cell exists inside the
+  modeled domain, not necessarily that the real terrain is a closed basin.
+- Terrain analysis and mesh rebuilding use separate per-chunk dirty flags.
+  Elevation-changing systems must mark both. `TerrainMeshSystem` increments the
+  land revision after rebuilding; Vulkan re-uploads only changed revisions.
 - Chunk simulation must be deterministic and chunk-local before parallelism is
   introduced. Exchange cross-boundary effects in a distinct synchronization
   phase to avoid order-dependent results.
@@ -210,6 +219,9 @@ main.cpp registers systems
     GameSystem  -> Clock interface                      <- TimeSystem
     GameSystem  -> ChunkSimulation interface            <- ChunkSimulationSystem
     GameSystem  -> SunSimulation interface              <- SunSystem
+    GameSystem  -> TerrainGeneration interface          <- TerrainGenerationSystem
+    GameSystem  -> TerrainMeshing interface             <- TerrainMeshSystem
+    ChunkSimulationSystem -> ChunkTickSystem            <- TerrainAnalysisSystem
     ScreenSystem -> Camera interface                     <- CameraSystem
     ScreenSystem -> Clock interface                      <- TimeSystem
     ScreenSystem -> RenderSystem                        <- VulkanSystem

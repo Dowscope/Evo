@@ -12,6 +12,7 @@ public:
     virtual void updateChunk(
         Registry& registry,
         Chunk& chunk,
+        std::span<Chunk> chunks,
         double fixedStepSeconds
     ) = 0;
     virtual void collectBoundaryTransfers(

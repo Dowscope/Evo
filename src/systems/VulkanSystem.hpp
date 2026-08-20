@@ -71,6 +71,7 @@ private:
     Buffer _vertexBuffer;
     Buffer _indexBuffer;
     std::uint32_t _indexCount = 0;
+    std::uint64_t _landRevision = 0;
     Buffer _sunVertexBuffer;
     Buffer _sunIndexBuffer;
     std::uint32_t _sunIndexCount = 0;

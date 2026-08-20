@@ -13,6 +13,7 @@ struct Vertex {
 struct Land {
     std::vector<Vertex> vertices;
     std::vector<std::uint32_t> indices;
+    std::uint64_t revision = 0;
 };
 
 struct Sun {

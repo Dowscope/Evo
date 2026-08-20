@@ -284,8 +284,10 @@ void VulkanSystem::_createSyncObjects() {
 
 void VulkanSystem::render(const Scene& scene) {
     if (!scene.land || scene.land->indices.empty()) return;
-    if (!_indexCount) {
+    if (_landRevision != scene.land->revision) {
         _uploadLand(*scene.land);
+    }
+    if (!_sunIndexCount) {
         _uploadSun();
     }
     vkWaitForFences(_device, 1, &_frameFence, VK_TRUE, UINT64_MAX);
@@ -390,6 +392,15 @@ void VulkanSystem::render(const Scene& scene) {
 }
 
 void VulkanSystem::_uploadLand(const Land& land) {
+    if (_vertexBuffer.handle != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(_device);
+        vkDestroyBuffer(_device, _vertexBuffer.handle, nullptr);
+        vkFreeMemory(_device, _vertexBuffer.memory, nullptr);
+        vkDestroyBuffer(_device, _indexBuffer.handle, nullptr);
+        vkFreeMemory(_device, _indexBuffer.memory, nullptr);
+        _vertexBuffer = {};
+        _indexBuffer = {};
+    }
     VkDeviceSize vertexSize = sizeof(Vertex) * land.vertices.size();
     VkDeviceSize indexSize = sizeof(std::uint32_t) * land.indices.size();
     _vertexBuffer = _createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
@@ -402,6 +413,7 @@ void VulkanSystem::_uploadLand(const Land& land) {
     std::memcpy(data, land.indices.data(), indexSize);
     vkUnmapMemory(_device, _indexBuffer.memory);
     _indexCount = static_cast<std::uint32_t>(land.indices.size());
+    _landRevision = land.revision;
 }
 
 void VulkanSystem::_uploadSun() {

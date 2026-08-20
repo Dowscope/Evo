@@ -15,6 +15,8 @@ class RenderTarget;
 class Clock;
 class ChunkSimulation;
 class SunSimulation;
+class TerrainGeneration;
+class TerrainMeshing;
 
 class GameSystem final : public System {
 public:
@@ -27,25 +29,22 @@ public:
     void registerClock(Clock& clock);
     void registerChunkSimulation(ChunkSimulation& simulation);
     void registerSunSimulation(SunSimulation& simulation);
+    void registerTerrainGeneration(TerrainGeneration& generation);
+    void registerTerrainMeshing(TerrainMeshing& meshing);
     void update();
     void render();
 
 private:
     void _saveState();
-    void _createTerrainEntities();
-    void _createLand();
     void _resolveWorldSeed();
-    [[nodiscard]] float _terrainHeight(float x, float z) const;
-    [[nodiscard]] float _vertexElevation(
-        std::uint32_t vertexX,
-        std::uint32_t vertexZ
-    ) const;
 
     RenderTarget* _renderTarget = nullptr;
     Persistence* _persistence = nullptr;
     Clock* _clock = nullptr;
     ChunkSimulation* _chunkSimulation = nullptr;
     SunSimulation* _sunSimulation = nullptr;
+    TerrainGeneration* _terrainGeneration = nullptr;
+    TerrainMeshing* _terrainMeshing = nullptr;
     WorldConfig _config;
     Registry _registry;
     std::vector<Chunk> _chunks;

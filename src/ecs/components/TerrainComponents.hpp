@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ecs/Entity.hpp"
+
 #include <cstdint>
 
 struct GridPosition {
@@ -16,4 +18,19 @@ struct ChunkPosition {
 
 struct Elevation {
     float meters = 0.0F;
+};
+
+struct Slope {
+    float degrees = 0.0F;
+};
+
+struct Aspect {
+    float radians = 0.0F;
+    bool defined = false;
+};
+
+struct Drainage {
+    Entity downhillNeighbor = nullEntity;
+    float elevationDropMeters = 0.0F;
+    bool localDepression = false;
 };

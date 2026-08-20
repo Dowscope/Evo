@@ -27,7 +27,12 @@ void ChunkSimulationSystem::simulate(
         for (ChunkTickSystem* system : _tickSystems) {
             for (Chunk& chunk : chunks) {
                 if (chunk.simulationLevel == SimulationLevel::Active) {
-                    system->updateChunk(registry, chunk, time.fixedStepSeconds);
+                    system->updateChunk(
+                        registry,
+                        chunk,
+                        chunks,
+                        time.fixedStepSeconds
+                    );
                 }
             }
         }

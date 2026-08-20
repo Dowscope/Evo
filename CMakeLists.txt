@@ -32,6 +32,9 @@ add_executable(EVO
     src/systems/ScreenSystem.cpp
     src/systems/SaveSystem.cpp
     src/systems/SunSystem.cpp
+    src/systems/TerrainAnalysisSystem.cpp
+    src/systems/TerrainGenerationSystem.cpp
+    src/systems/TerrainMeshSystem.cpp
     src/systems/System.cpp
     src/systems/TimeSystem.cpp
     src/systems/VulkanSystem.cpp

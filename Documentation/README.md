@@ -133,6 +133,12 @@ This keeps implementations replaceable and makes dependencies visible in
   phases.
 - `SunSystem` derives sun position and intensity from normalized day progress and
   configured world dimensions.
+- `TerrainGenerationSystem` creates chunk membership and ECS terrain components
+  from the resolved world seed.
+- `TerrainAnalysisSystem` derives slope, aspect, and D8 drainage on terrain-dirty
+  chunks as a registered fixed-tick processor.
+- `TerrainMeshSystem` rebuilds revisioned render geometry only when a chunk marks
+  its terrain mesh dirty.
 - `GameSystem` coordinates registered simulation interfaces and renders only
   through its registered `RenderTarget`. It chooses which game state is
   persistent through its registered `Persistence` interface and owns land and
@@ -159,12 +165,16 @@ Only `ScreenSystem` owns a `RenderSystem`. The active implementation is
 be selected by `ScreenSystem`; no changes should be required in `GameSystem`,
 `EventSystem`, or the main loop.
 
-`GameSystem` creates the dirt land as a configurable procedural grid. Four
-octaves of seeded, smoothly interpolated value noise produce deterministic
-large landforms and smaller surface variation. Subtle height-based color
-variation helps expose the shape. Darker soil walls follow the uneven perimeter
-down to a flat bottom, preserving visible thickness for future underground
-layers.
+`TerrainGenerationSystem` creates the dirt land as a configurable procedural
+grid. Four octaves of seeded, smoothly interpolated value noise produce
+deterministic large landforms and smaller surface variation. It creates each
+terrain entity and initializes its position, elevation, slope, aspect, and
+drainage component slots.
+
+`TerrainMeshSystem` converts ECS elevation into the visible surface. Subtle
+height-based color variation helps expose the shape. Darker soil walls follow
+the uneven perimeter down to a flat bottom, preserving visible thickness for
+future underground layers.
 
 `SunSystem` advances the sun from central day progress. `GameSystem` coordinates
 the registered simulation interfaces and submits terrain and sun together as
@@ -197,8 +207,30 @@ level-of-detail approximations.
 
 The terrain mesh is derived from ECS elevation components. Mesh vertices average
 adjacent cell elevations, so rendering is a view of simulation data rather than
-the authoritative world model. Do not store future moisture, soil, climate, or
-genome state in render vertices.
+the authoritative world model. Each chunk has an independent mesh-dirty flag.
+When any flag is set, `TerrainMeshSystem` rebuilds the mesh, increments its
+revision, and clears the flags. `VulkanSystem` waits for outstanding GPU work and
+re-uploads terrain buffers only when that revision changes. Do not store future
+moisture, soil, climate, or genome state in render vertices.
+
+### Terrain analysis
+
+`TerrainAnalysisSystem` is the first real `ChunkTickSystem`. It runs only for a
+chunk whose terrain-analysis dirty flag is set and derives:
+
+- `Slope::degrees` from the magnitude of central elevation differences divided
+  by physical cell distance. World edges use one-sided differences.
+- `Aspect::radians` as the steepest-descent direction from positive world X
+  toward positive world Z, normalized to `[0, 2π)`. Aspect is explicitly marked
+  undefined on level terrain.
+- `Drainage::downhillNeighbor` using the D8 neighbor with the greatest positive
+  elevation drop per meter. It also records vertical drop in meters and whether
+  no lower modeled neighbor exists.
+
+Analysis may read elevation across chunk boundaries because elevation is stable
+during this phase. It writes only components belonging to the chunk currently
+being processed. Dynamic water transfer will still use the separate collection
+and application phases.
 
 ### Time architecture
 

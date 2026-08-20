@@ -17,5 +17,7 @@ struct Chunk {
     std::int32_t z = 0;
     SimulationLevel simulationLevel = SimulationLevel::Active;
     std::uint64_t completedTicks = 0;
+    bool terrainAnalysisDirty = true;
+    bool terrainMeshDirty = true;
     std::vector<Entity> terrainCells;
 };

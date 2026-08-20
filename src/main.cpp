@@ -8,6 +8,9 @@
 #include "systems/TimeSystem.hpp"
 #include "systems/ChunkSimulationSystem.hpp"
 #include "systems/SunSystem.hpp"
+#include "systems/TerrainAnalysisSystem.hpp"
+#include "systems/TerrainGenerationSystem.hpp"
+#include "systems/TerrainMeshSystem.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -19,6 +22,9 @@ std::unique_ptr<EventSystem> eventSystem;
 std::unique_ptr<TimeSystem> timeSystem;
 std::unique_ptr<ChunkSimulationSystem> chunkSimulationSystem;
 std::unique_ptr<SunSystem> sunSystem;
+std::unique_ptr<TerrainAnalysisSystem> terrainAnalysisSystem;
+std::unique_ptr<TerrainGenerationSystem> terrainGenerationSystem;
+std::unique_ptr<TerrainMeshSystem> terrainMeshSystem;
 std::unique_ptr<CameraSystem> cameraSystem;
 std::unique_ptr<ScreenSystem> screenSystem;
 std::unique_ptr<GameSystem> gameSystem;
@@ -31,6 +37,9 @@ void init() {
     timeSystem = std::make_unique<TimeSystem>(config.time);
     chunkSimulationSystem = std::make_unique<ChunkSimulationSystem>();
     sunSystem = std::make_unique<SunSystem>(config.world);
+    terrainAnalysisSystem = std::make_unique<TerrainAnalysisSystem>(config.world);
+    terrainGenerationSystem = std::make_unique<TerrainGenerationSystem>();
+    terrainMeshSystem = std::make_unique<TerrainMeshSystem>();
     cameraSystem = std::make_unique<CameraSystem>();
     saveSystem = std::make_unique<SaveSystem>("Data/evo.save");
     screenSystem = std::make_unique<ScreenSystem>(config.window);
@@ -40,6 +49,9 @@ void init() {
     timeSystem->init();
     chunkSimulationSystem->init();
     sunSystem->init();
+    terrainAnalysisSystem->init();
+    terrainGenerationSystem->init();
+    terrainMeshSystem->init();
     cameraSystem->init();
     saveSystem->init();
     screenSystem->init();
@@ -49,11 +61,14 @@ void init() {
     eventSystem->registerListener(*cameraSystem);
     screenSystem->registerCamera(*cameraSystem);
     screenSystem->registerClock(*timeSystem);
+    chunkSimulationSystem->registerTickSystem(*terrainAnalysisSystem);
     gameSystem->registerRenderTarget(*screenSystem);
     gameSystem->registerPersistence(*saveSystem);
     gameSystem->registerClock(*timeSystem);
     gameSystem->registerChunkSimulation(*chunkSimulationSystem);
     gameSystem->registerSunSimulation(*sunSystem);
+    gameSystem->registerTerrainGeneration(*terrainGenerationSystem);
+    gameSystem->registerTerrainMeshing(*terrainMeshSystem);
     gameSystem->init();
 }
 
@@ -80,6 +95,9 @@ void shutdown() {
         saveSystem->flush();
     }
     screenSystem.reset();
+    terrainMeshSystem.reset();
+    terrainGenerationSystem.reset();
+    terrainAnalysisSystem.reset();
     sunSystem.reset();
     chunkSimulationSystem.reset();
     cameraSystem.reset();

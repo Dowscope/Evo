@@ -27,6 +27,8 @@ A separate stats window displays the current simulation day and advances in
 sync with the sun's orbit.
 `ChunkSimulationSystem` executes deterministic local, boundary-collection, and
 boundary-application phases, while `SunSystem` owns solar behavior.
+Dedicated terrain generation, analysis, and mesh systems create ECS cells,
+derive physical terrain properties, and maintain the revisioned render view.
 It includes a swapchain, depth buffer, graphics pipeline, compiled shaders,
 vertex/index buffers, frame synchronization, and resize recreation.
 

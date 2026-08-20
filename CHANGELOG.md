@@ -3,6 +3,26 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Terrain ECS Systems
+
+### Added
+
+- Added focused terrain generation, analysis, and mesh systems behind narrow
+  registered interfaces.
+- Added derived slope in degrees, aspect in radians with explicit undefined
+  state on level ground, and D8 steepest-descent drainage components.
+- Added independent terrain-analysis and terrain-mesh dirty flags per chunk.
+- Added land mesh revisions and conditional Vulkan terrain-buffer re-uploading.
+
+### Changed
+
+- Moved procedural entity/component generation and render-mesh construction out
+  of `GameSystem`.
+- Registered terrain analysis as the first fixed-tick `ChunkTickSystem`.
+- Made terrain analysis read across chunk boundaries while writing only the
+  currently processed chunk.
+- Made `TerrainMeshSystem` rebuild only after ECS elevation is marked dirty.
+
 ## 2026-08-20 - Deterministic Simulation Pipeline
 
 ### Added
