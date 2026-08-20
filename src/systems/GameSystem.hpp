@@ -3,12 +3,18 @@
 #include "systems/System.hpp"
 #include "rendering/Scene.hpp"
 #include "core/ApplicationConfig.hpp"
+#include "ecs/Entity.hpp"
+#include "ecs/Registry.hpp"
+#include "world/Chunk.hpp"
 
-#include <chrono>
 #include <cstdint>
+#include <vector>
 
 class Persistence;
 class RenderTarget;
+class Clock;
+class ChunkSimulation;
+class SunSimulation;
 
 class GameSystem final : public System {
 public:
@@ -18,24 +24,34 @@ public:
     void init() override;
     void registerRenderTarget(RenderTarget& renderTarget);
     void registerPersistence(Persistence& persistence);
+    void registerClock(Clock& clock);
+    void registerChunkSimulation(ChunkSimulation& simulation);
+    void registerSunSimulation(SunSimulation& simulation);
     void update();
     void render();
 
 private:
     void _saveState();
+    void _createTerrainEntities();
     void _createLand();
-    void _updateSun(float elapsedSeconds);
     void _resolveWorldSeed();
+    [[nodiscard]] float _terrainHeight(float x, float z) const;
+    [[nodiscard]] float _vertexElevation(
+        std::uint32_t vertexX,
+        std::uint32_t vertexZ
+    ) const;
 
     RenderTarget* _renderTarget = nullptr;
     Persistence* _persistence = nullptr;
+    Clock* _clock = nullptr;
+    ChunkSimulation* _chunkSimulation = nullptr;
+    SunSimulation* _sunSimulation = nullptr;
     WorldConfig _config;
+    Registry _registry;
+    std::vector<Chunk> _chunks;
+    std::vector<Entity> _terrainEntities;
     Land _land;
     Sun _sun;
-    float _sunAngle = 0.0F;
     std::uint64_t _updateCount = 0;
-    std::chrono::steady_clock::time_point _lastUpdate =
-        std::chrono::steady_clock::now();
-    std::chrono::steady_clock::time_point _lastCheckpoint =
-        std::chrono::steady_clock::now();
+    double _nextCheckpointRealTimeSeconds = 5.0;
 };

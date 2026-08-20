@@ -26,11 +26,14 @@ add_executable(EVO
     src/core/ApplicationConfig.cpp
     src/core/Logger.cpp
     src/systems/CameraSystem.cpp
+    src/systems/ChunkSimulationSystem.cpp
     src/systems/EventSystem.cpp
     src/systems/GameSystem.cpp
     src/systems/ScreenSystem.cpp
     src/systems/SaveSystem.cpp
+    src/systems/SunSystem.cpp
     src/systems/System.cpp
+    src/systems/TimeSystem.cpp
     src/systems/VulkanSystem.cpp
 )
 

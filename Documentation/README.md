@@ -16,6 +16,11 @@ make run
 EVO opens in a 1280 x 720 window. Press Escape or use the window close button
 to exit.
 
+EVO also opens a compact, non-resizable stats window. Its title displays the
+current simulation day, beginning with `EVO Stats - Day 1`. The counter follows
+simulation time, so it stops while simulation time is paused and responds to
+the configured time scale.
+
 ### Camera controls
 
 Use these controls to inspect the visible land:
@@ -45,7 +50,13 @@ Edit `config/config.json` before starting EVO to change startup settings:
   "network.address": "127.0.0.1",
   "network.port": 0,
   "world.seed": 0,
-  "world.grid_size": 32
+  "world.chunk_size": 16,
+  "world.chunks_x": 2,
+  "world.chunks_z": 2,
+  "world.cell_size_meters": 1.0,
+  "time.fixed_step_seconds": 0.1,
+  "time.scale": 1.0,
+  "time.day_length_seconds": 60.0
 }
 ```
 
@@ -55,9 +66,17 @@ Set `world.seed` to `0` to create a fresh random landscape on every launch. EVO
 prints the selected seed in the terminal and immediately checkpoints it as
 `world.last_seed` in `Data/evo.save`. Copy that nonzero value back into
 `world.seed` to recreate the landscape later. Any nonzero seed always produces
-the same starting terrain. `world.grid_size` sets the number of terrain cells
-along each side and must be between 2 and 256; larger values create a smoother
-mesh but require more vertices and triangles.
+the same starting terrain. `world.chunk_size` sets the cell width and depth of
+each square chunk and must be between 2 and 64. `world.chunks_x` and
+`world.chunks_z` set the initial chunk layout and must each be between 1 and 64.
+`world.cell_size_meters` defines physical cell width and must be between 0.1 and
+100 meters. The defaults create four 16 x 16 chunks and a 32 x 32 meter world.
+`time.fixed_step_seconds` defines deterministic simulation tick duration and
+must be greater than zero and at most 10 seconds. `time.scale` multiplies
+simulation time without changing real-time clocks and must be between 0 and
+1000. A scale of zero stops simulation time.
+`time.day_length_seconds` defines one complete simulated day and sun orbit in
+simulation seconds and must be positive. The default is 60 seconds.
 
 ### Saved progress
 
@@ -98,16 +117,26 @@ This keeps implementations replaceable and makes dependencies visible in
 
 - `System` provides the shared lifecycle and lifecycle logging behavior.
 - `ScreenSystem` owns the GLFW window and the selected rendering backend. It is
-  also an event source, event listener, and render target.
+  also an event source, event listener, and render target. It owns the separate
+  stats window and reads day state through its registered `Clock`.
 - `RenderSystem` is the interface implemented by rendering backends.
 - `VulkanSystem` is the current renderer and owns all Vulkan code and objects.
 - `CameraSystem` owns the 3D view and projection. It receives mouse input only
   as events and registers with `ScreenSystem` through the `Camera` interface.
 - `EventSystem` polls registered event sources and dispatches queued events to
   registered listeners.
-- `GameSystem` contains game simulation behavior and renders only through its
-  registered `RenderTarget`. It chooses which game state is persistent through
-  its registered `Persistence` interface. It owns land and other world data.
+- `TimeSystem` owns monotonic real time, scaled simulation time, pause and time
+  scale state, and deterministic fixed-step production. Other systems access it
+  only through the registered `Clock` interface.
+- `ChunkSimulationSystem` consumes fixed steps and executes registered ECS tick
+  processors through local update, boundary collection, and boundary application
+  phases.
+- `SunSystem` derives sun position and intensity from normalized day progress and
+  configured world dimensions.
+- `GameSystem` coordinates registered simulation interfaces and renders only
+  through its registered `RenderTarget`. It chooses which game state is
+  persistent through its registered `Persistence` interface and owns land and
+  other current world data.
 - `SaveSystem` owns the on-disk save file and atomic-style replacement writes.
 - `Logger` is the process-wide logging entry point. Systems use it instead of
   writing directly to standard output.
@@ -137,9 +166,61 @@ variation helps expose the shape. Darker soil walls follow the uneven perimeter
 down to a flat bottom, preserving visible thickness for future underground
 layers.
 
-`GameSystem` also advances the sun's orbit using elapsed time. The terrain and
-sun are submitted together as scene data, without involving rendering systems
-in world generation or simulation.
+`SunSystem` advances the sun from central day progress. `GameSystem` coordinates
+the registered simulation interfaces and submits terrain and sun together as
+scene data, without involving rendering systems in world generation or
+simulation.
+
+### ECS terrain and chunks
+
+`GameSystem` owns an ECS `Registry`. Every terrain cell has a stable entity ID
+and three initial data-only components: `GridPosition`, `ChunkPosition`, and
+`Elevation`, whose value is explicitly measured in meters. Components are held
+in type-specific packed arrays; entities do not contain behavior.
+
+The world is partitioned into configurable square `Chunk` values. Each chunk
+contains the terrain entity IDs for its local cells, a simulation level, and a
+completed fixed-tick count. The default 2 x 2 layout contains four independently
+schedulable 16 x 16 chunks. All four begin active; nearby, distant, and dormant
+levels exist for future scheduling but do not yet approximate biological state.
+
+`ChunkSimulationSystem` runs every completed fixed step in three ordered phases:
+
+1. Every registered `ChunkTickSystem` updates each active chunk locally.
+2. Each tick system collects transfers that must cross chunk boundaries.
+3. Each tick system applies those transfers only after local work is complete.
+
+This phase barrier prevents one chunk from observing partially updated neighbor
+state and establishes a deterministic path to later parallel execution. No
+reduced-frequency scheduling is active yet; correctness comes before simulation
+level-of-detail approximations.
+
+The terrain mesh is derived from ECS elevation components. Mesh vertices average
+adjacent cell elevations, so rendering is a view of simulation data rather than
+the authoritative world model. Do not store future moisture, soil, climate, or
+genome state in render vertices.
+
+### Time architecture
+
+`main.cpp` updates `TimeSystem` before events and game state each frame.
+`TimeSystem` publishes a `TimeFrame` containing real frame delta, total real
+time, scaled simulation delta, total simulation time, fixed-step duration, and
+the number of complete fixed steps available this frame.
+
+Real time uses `std::chrono::steady_clock` and is never affected by pause or time
+scale. Simulation time stops while paused and otherwise advances by real delta
+multiplied by the time scale. Fractional fixed-step time remains accumulated for
+the next frame, preventing frame rate from changing simulation tick counts.
+
+`GameSystem` receives the narrow `Clock`, `SunSimulation`, and `ChunkSimulation`
+interfaces. It delegates solar and fixed-tick behavior, while five-second save
+checkpoints follow real time. No other class should call a system clock directly
+or maintain an independent frame timer.
+
+`TimeSystem` derives a one-based day number and normalized day progress from
+simulation time and configured day length. `SunSystem` uses day progress for the
+sun orbit, making one orbit exactly one day. `ScreenSystem` displays the day
+number in its separate stats window and updates the title only when it changes.
 `ScreenSystem` combines that data with its registered camera frame, then passes
 the complete scene to `RenderSystem`. This keeps world creation out of the
 screen, camera, and Vulkan layers.
@@ -174,9 +255,10 @@ destinations should be implemented inside `Logger`, without changing callers.
 `ConfigLoader` is core startup infrastructure, not a system. It parses
 `config/config.json` into typed `ApplicationConfig` data before system
 construction. `main.cpp` passes only `WindowConfig` to `ScreenSystem` and
-`WorldConfig` to `GameSystem`. Continue this pattern for future network settings:
-pass typed data to the system that needs it, and do not expose a global
-configuration object.
+`WorldConfig` to `GameSystem`, and `TimeConfig` to `TimeSystem`. World
+configuration includes seed, chunk size, chunk counts, and physical cell size.
+Continue this pattern for future network settings: pass typed data to the system
+that needs it, and do not expose a global configuration object.
 
 ### Persistence architecture
 

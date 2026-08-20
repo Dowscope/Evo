@@ -10,6 +10,7 @@
 
 class RenderSystem;
 class Camera;
+class Clock;
 struct GLFWwindow;
 
 class RenderTarget {
@@ -32,6 +33,7 @@ public:
     void onEvent(const Event& event) override;
     void render(const Land& land, const Sun& sun) override;
     void registerCamera(Camera& camera);
+    void registerClock(Clock& clock);
 
     [[nodiscard]] bool shouldClose() const;
 
@@ -55,10 +57,14 @@ private:
     static void _handleFramebufferSize(GLFWwindow* window, int width, int height);
 
     void _emit(Event event) const;
+    void _updateStatsWindow();
 
     GLFWwindow* _window = nullptr;
+    GLFWwindow* _statsWindow = nullptr;
     WindowConfig _config;
     EventCallback _eventCallback;
     std::unique_ptr<RenderSystem> _renderer;
     Camera* _camera = nullptr;
+    Clock* _clock = nullptr;
+    std::uint64_t _displayedDay = 0;
 };

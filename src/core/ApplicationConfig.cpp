@@ -1,6 +1,7 @@
 #include "core/ApplicationConfig.hpp"
 
 #include <charconv>
+#include <cmath>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -121,8 +122,20 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
             config.network.port = parseNumber<std::uint16_t>(value, key);
         } else if (key == "world.seed") {
             config.world.seed = parseNumber<std::uint64_t>(value, key);
-        } else if (key == "world.grid_size") {
-            config.world.gridSize = parseNumber<std::uint32_t>(value, key);
+        } else if (key == "world.chunk_size") {
+            config.world.chunkSize = parseNumber<std::uint32_t>(value, key);
+        } else if (key == "world.chunks_x") {
+            config.world.chunksX = parseNumber<std::uint32_t>(value, key);
+        } else if (key == "world.chunks_z") {
+            config.world.chunksZ = parseNumber<std::uint32_t>(value, key);
+        } else if (key == "world.cell_size_meters") {
+            config.world.cellSizeMeters = parseNumber<float>(value, key);
+        } else if (key == "time.fixed_step_seconds") {
+            config.time.fixedStepSeconds = parseNumber<double>(value, key);
+        } else if (key == "time.scale") {
+            config.time.timeScale = parseNumber<double>(value, key);
+        } else if (key == "time.day_length_seconds") {
+            config.time.dayLengthSeconds = parseNumber<double>(value, key);
         }
     }
 
@@ -133,8 +146,35 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
         config.window.height <= 0) {
         throw std::runtime_error("Window configuration is invalid");
     }
-    if (config.world.gridSize < 2 || config.world.gridSize > 256) {
-        throw std::runtime_error("world.grid_size must be between 2 and 256");
+    if (config.world.chunkSize < 2 || config.world.chunkSize > 64) {
+        throw std::runtime_error("world.chunk_size must be between 2 and 64");
+    }
+    if (config.world.chunksX == 0 || config.world.chunksX > 64 ||
+        config.world.chunksZ == 0 || config.world.chunksZ > 64) {
+        throw std::runtime_error(
+            "world chunk counts must each be between 1 and 64"
+        );
+    }
+    if (config.world.cellSizeMeters < 0.1F ||
+        config.world.cellSizeMeters > 100.0F) {
+        throw std::runtime_error(
+            "world.cell_size_meters must be between 0.1 and 100"
+        );
+    }
+    if (!std::isfinite(config.time.fixedStepSeconds) ||
+        config.time.fixedStepSeconds <= 0.0 ||
+        config.time.fixedStepSeconds > 10.0) {
+        throw std::runtime_error(
+            "time.fixed_step_seconds must be greater than 0 and at most 10"
+        );
+    }
+    if (!std::isfinite(config.time.timeScale) || config.time.timeScale < 0.0 ||
+        config.time.timeScale > 1000.0) {
+        throw std::runtime_error("time.scale must be between 0 and 1000");
+    }
+    if (!std::isfinite(config.time.dayLengthSeconds) ||
+        config.time.dayLengthSeconds <= 0.0) {
+        throw std::runtime_error("time.day_length_seconds must be positive");
     }
     return config;
 }

@@ -27,7 +27,7 @@ private:
     glm::vec3 _target{0.0F, 0.0F, 0.0F};
     float _yaw = 45.0F;
     float _pitch = 35.0F;
-    float _distance = 12.0F;
+    float _distance = 40.0F;
     double _lastMouseX = 0.0;
     double _lastMouseY = 0.0;
     bool _hasMousePosition = false;

@@ -26,9 +26,15 @@ user/programmer manual in `Documentation` when relevant.
   the configuration file themselves.
 - Window title and dimensions belong to `WindowConfig`. Future IP addresses and
   ports belong to `NetworkConfig`.
-- Terrain seed and grid resolution belong to `WorldConfig`, which is passed only
-  to `GameSystem`. Grid size is validated from 2 through 256. Identical seeds
-  and settings must reproduce identical starting terrain.
+- Terrain seed, chunk size, chunk counts, and physical cell size belong to
+  `WorldConfig`, which is passed only to `GameSystem`. Chunk size is validated
+  from 2 through 64 cells, chunk counts from 1 through 64 per axis, and cell size
+  from 0.1 through 100 meters. Identical settings must reproduce identical
+  starting terrain.
+- Fixed-step duration and initial time scale belong to `TimeConfig`, which is
+  passed only to `TimeSystem`. Fixed steps must be positive and no longer than
+  10 seconds; time scale is validated from 0 through 1000. Positive configured
+  day length defines one solar orbit in simulation seconds.
 - A configured world seed of `0` requests a fresh random nonzero seed. Resolve it
   in `GameSystem` before terrain generation, log it, and immediately checkpoint
   it as `world.last_seed`. Do not rewrite the read-only startup configuration.
@@ -49,6 +55,25 @@ application lifecycle functions are:
 
 Top-level systems are owned through pointers. Do not put window, input, game,
 or graphics implementation details directly in `main.cpp`.
+
+`update()` advances `TimeSystem` first, then events, then game state. Preserve
+this order so every consumer observes the current frame's timing snapshot.
+
+## Time
+
+- `TimeSystem` is the sole owner of monotonic real time, simulation time, pause
+  state, time scale, fixed-step accumulation, and fixed-step production.
+- Systems that need time receive the narrow `Clock` interface through explicit
+  registration. Do not call system clocks or maintain independent frame timers
+  outside `TimeSystem`.
+- `TimeFrame` exposes real delta/elapsed time, scaled simulation delta/elapsed
+  time, fixed-step duration, completed fixed-step count, one-based day number,
+  and normalized day progress.
+- Pause and time scale affect simulation time only. Real time continues for
+  operational behavior such as persistence checkpoints.
+- Retain fractional fixed-step time between frames. Simulation systems use fixed
+  steps for deterministic state changes and may use simulation delta or total
+  simulation time for continuous presentation state.
 
 ## System lifecycle
 
@@ -76,6 +101,9 @@ or graphics implementation details directly in `main.cpp`.
 
 - `ScreenSystem` is the only top-level system responsible for window creation
   and anything presented to the screen.
+- `ScreenSystem` owns both the main game window and the compact stats window.
+  The stats window displays the current day in its title and receives timing
+  only through an explicitly registered `Clock` interface.
 - `ScreenSystem` alone declares, owns, initializes, and accesses the rendering
   backend.
 - All Vulkan types, calls, and lifetime management belong in `VulkanSystem`.
@@ -110,6 +138,9 @@ or graphics implementation details directly in `main.cpp`.
 ## Game
 
 - Game logic belongs in `GameSystem`.
+- `GameSystem` coordinates registered simulation interfaces and owns current
+  world state; specialized behavior belongs in focused systems rather than
+  accumulating inside the coordinator.
 - Land and other game-world objects are created and owned by `GameSystem`, then
   submitted as scene data through its registered render target.
 - The current land is a configurable deterministic procedural grid built from
@@ -121,13 +152,37 @@ or graphics implementation details directly in `main.cpp`.
 - `GameSystem` must not know how the window or graphics backend is implemented.
 - `GameSystem` receives persistence through explicit registration and owns the
   decision about which game state must be saved.
-- The sun is game-world state owned and advanced by `GameSystem`, then submitted
-  through `Scene`. Rendering code must not own the orbit simulation. Future
-  lighting, temperature, and vegetation systems should consume this shared
-  world state through narrow registered interfaces.
-- `Sun::intensity` is derived from the sun's height by `GameSystem`. The renderer
-  consumes position and intensity for directional terrain lighting and the
-  day/night sky transition; it must not independently calculate world time.
+- The sun is game-world state coordinated by `GameSystem` and advanced through
+  the registered `SunSimulation` interface implemented by `SunSystem`, then
+  submitted through `Scene`. Rendering code must not own orbit simulation.
+- `SunSystem` derives sun position and intensity from normalized day progress
+  and world dimensions. The renderer consumes those values for directional
+  terrain lighting and the day/night sky transition; it must not independently
+  calculate world time.
+
+## ECS and world chunks
+
+- Simulation state uses ECS composition. Entities are stable numeric IDs;
+  components contain data only; behavior belongs in systems.
+- The ECS `Registry` stores each component type in a packed array with entity
+  lookup. Do not add behavior, inheritance, or rendering calls to components.
+- Every terrain cell is an entity with `GridPosition`, `ChunkPosition`, and
+  meter-valued `Elevation`. Add environmental components only after their units,
+  inputs, and update model are defined; do not seed arbitrary biological stats.
+- The world is partitioned into configurable square chunks. Each chunk owns the
+  IDs of its terrain cells and scheduling metadata, not duplicate cell state.
+- The default world is a 2 x 2 layout of 16 x 16 chunks using one-meter cells.
+  Chunk layout and cell size may change through `WorldConfig`.
+- Terrain rendering is derived from ECS cell elevation. Render vertices are not
+  authoritative simulation state.
+- Chunk simulation must be deterministic and chunk-local before parallelism is
+  introduced. Exchange cross-boundary effects in a distinct synchronization
+  phase to avoid order-dependent results.
+- `ChunkSimulationSystem` consumes `TimeFrame::fixedSteps`. For each step, run
+  all registered `ChunkTickSystem` local updates, then all boundary-collection
+  calls, then all boundary-application calls. Do not interleave these phases.
+- All chunks remain `Active` and receive every tick until reduced-frequency
+  behavior has a defined approximation model and verification criteria.
 
 ## Persistence
 
@@ -152,7 +207,11 @@ main.cpp registers systems
     EventSystem -> EventListener interface               <- CameraSystem
     GameSystem  -> RenderTarget interface               <- ScreenSystem
     GameSystem  -> Persistence interface                <- SaveSystem
+    GameSystem  -> Clock interface                      <- TimeSystem
+    GameSystem  -> ChunkSimulation interface            <- ChunkSimulationSystem
+    GameSystem  -> SunSimulation interface              <- SunSystem
     ScreenSystem -> Camera interface                     <- CameraSystem
+    ScreenSystem -> Clock interface                      <- TimeSystem
     ScreenSystem -> RenderSystem                        <- VulkanSystem
 ```
 

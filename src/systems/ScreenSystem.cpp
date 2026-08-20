@@ -2,6 +2,7 @@
 
 #include "rendering/Camera.hpp"
 #include "systems/VulkanSystem.hpp"
+#include "time/Clock.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -16,6 +17,9 @@ ScreenSystem::ScreenSystem(WindowConfig config)
 
 ScreenSystem::~ScreenSystem() {
     _renderer.reset();
+    if (_statsWindow != nullptr) {
+        glfwDestroyWindow(_statsWindow);
+    }
     if (_window != nullptr) {
         glfwDestroyWindow(_window);
     }
@@ -40,6 +44,18 @@ void ScreenSystem::init() {
     );
     if (_window == nullptr) {
         throw std::runtime_error("Failed to create the EVO window");
+    }
+
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    _statsWindow = glfwCreateWindow(
+        360,
+        120,
+        "EVO Stats - Day 1",
+        nullptr,
+        nullptr
+    );
+    if (_statsWindow == nullptr) {
+        throw std::runtime_error("Failed to create the EVO stats window");
     }
 
     glfwSetWindowUserPointer(_window, this);
@@ -87,6 +103,7 @@ void ScreenSystem::render(const Land& land, const Sun& sun) {
         throw std::runtime_error("ScreenSystem requires a registered camera");
     }
     _renderer->render({.land = &land, .sun = sun, .camera = _camera->frame()});
+    _updateStatsWindow();
 }
 
 void ScreenSystem::registerCamera(Camera& camera) {
@@ -95,6 +112,11 @@ void ScreenSystem::registerCamera(Camera& camera) {
     int height = 0;
     glfwGetFramebufferSize(_window, &width, &height);
     _camera->setViewport(width, height);
+}
+
+void ScreenSystem::registerClock(Clock& clock) {
+    _clock = &clock;
+    _updateStatsWindow();
 }
 
 bool ScreenSystem::shouldClose() const {
@@ -161,4 +183,17 @@ void ScreenSystem::_emit(Event event) const {
     if (_eventCallback) {
         _eventCallback(event);
     }
+}
+
+void ScreenSystem::_updateStatsWindow() {
+    if (_clock == nullptr || _statsWindow == nullptr) {
+        return;
+    }
+    const std::uint64_t day = _clock->frame().day;
+    if (day == _displayedDay) {
+        return;
+    }
+    _displayedDay = day;
+    const std::string title = "EVO Stats - Day " + std::to_string(day);
+    glfwSetWindowTitle(_statsWindow, title.c_str());
 }

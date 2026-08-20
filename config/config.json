@@ -5,5 +5,11 @@
   "network.address": "127.0.0.1",
   "network.port": 0,
   "world.seed": 0,
-  "world.grid_size": 32
+  "world.chunk_size": 16,
+  "world.chunks_x": 2,
+  "world.chunks_z": 2,
+  "world.cell_size_meters": 1.0,
+  "time.fixed_step_seconds": 0.1,
+  "time.scale": 1.0,
+  "time.day_length_seconds": 60.0
 }

@@ -41,7 +41,7 @@ CameraFrame CameraSystem::frame() const {
         static_cast<float>(_viewportWidth) /
             static_cast<float>(_viewportHeight),
         0.1F,
-        200.0F
+        1000.0F
     );
     result.projection[1][1] *= -1.0F;
     return result;
@@ -109,6 +109,6 @@ void CameraSystem::_zoom(double amount) {
     _distance = std::clamp(
         _distance * (1.0F - static_cast<float>(amount) * 0.1F),
         2.0F,
-        80.0F
+        500.0F
     );
 }

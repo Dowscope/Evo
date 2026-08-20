@@ -3,6 +3,80 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Deterministic Simulation Pipeline
+
+### Added
+
+- Added `SunSystem` and the narrow `SunSimulation` interface for solar position
+  and intensity derived from central day progress.
+- Added `ChunkSimulationSystem`, `ChunkSimulation`, and `ChunkTickSystem` as the
+  fixed-step ECS execution boundary.
+- Added ordered local-update, boundary-collection, and boundary-application
+  phases for every fixed tick.
+- Added per-chunk completed-tick tracking while keeping all chunks fully active.
+
+### Changed
+
+- Reduced `GameSystem` to coordinating registered sun and chunk simulation
+  interfaces instead of directly implementing solar behavior.
+- Registered and initialized focused sun and chunk systems explicitly in
+  `main.cpp`.
+
+## 2026-08-20 - Day Stats Window
+
+### Added
+
+- Added a separate non-resizable stats window whose title displays the current
+  one-based simulation day.
+- Added configured simulation-day duration plus day number and normalized day
+  progress to `TimeSystem` timing snapshots.
+- Registered the narrow `Clock` interface with `ScreenSystem` for stats display.
+
+### Changed
+
+- Synchronized the sun orbit directly to normalized day progress so exactly one
+  solar orbit occurs per displayed day.
+- Limited stats-window title updates to day transitions.
+
+## 2026-08-20 - Central Time System
+
+### Added
+
+- Added `TimeSystem` as the sole owner of monotonic real time, scaled simulation
+  time, pause state, time scale, and deterministic fixed-step accumulation.
+- Added the narrow `Clock` interface and immutable per-frame timing snapshots for
+  explicitly registered consumers.
+- Added validated JSON settings for fixed-step duration and initial time scale.
+
+### Changed
+
+- Registered `TimeSystem` with `GameSystem` and updated it before events and game
+  state in the main loop.
+- Moved sun movement to central simulation-day timing, checkpoint scheduling to
+  real time, and game update counting to completed fixed simulation steps.
+- Removed independent steady-clock timers from `GameSystem` and time accumulation
+  from chunk data.
+
+## 2026-08-20 - ECS Terrain Chunks
+
+### Added
+
+- Added stable ECS entity IDs and type-specific packed component storage.
+- Added data-only grid-position, chunk-position, and meter-valued elevation
+  components for every terrain cell.
+- Added configurable chunks with simulation-level and elapsed-time scheduling
+  metadata, defaulting to four 16 x 16 chunks in a 2 x 2 layout.
+- Added explicit physical cell size configuration, defaulting to one meter.
+
+### Changed
+
+- Replaced the single terrain grid setting with `world.chunk_size`,
+  `world.chunks_x`, `world.chunks_z`, and `world.cell_size_meters`.
+- Made the visible terrain mesh derive its heights from ECS elevation components
+  by averaging adjacent cells at mesh vertices.
+- Scaled the starting camera, clipping range, and sun orbit for the larger
+  default 32 x 32 meter world.
+
 ## 2026-08-20 - Seeded World Configuration
 
 ### Added
