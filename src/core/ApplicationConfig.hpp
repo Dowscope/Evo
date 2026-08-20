@@ -15,9 +15,15 @@ struct NetworkConfig {
     std::uint16_t port = 0;
 };
 
+struct WorldConfig {
+    std::uint64_t seed = 2847593;
+    std::uint32_t gridSize = 32;
+};
+
 struct ApplicationConfig {
     WindowConfig window;
     NetworkConfig network;
+    WorldConfig world;
 };
 
 class ConfigLoader final {

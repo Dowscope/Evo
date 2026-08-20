@@ -15,6 +15,11 @@ struct Land {
     std::vector<std::uint32_t> indices;
 };
 
+struct Sun {
+    glm::vec3 position{0.0F, 6.0F, 8.0F};
+    float intensity = 1.0F;
+};
+
 struct CameraFrame {
     glm::mat4 view{1.0F};
     glm::mat4 projection{1.0F};
@@ -22,5 +27,6 @@ struct CameraFrame {
 
 struct Scene {
     const Land* land = nullptr;
+    Sun sun;
     CameraFrame camera;
 };

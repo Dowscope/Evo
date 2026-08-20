@@ -3,6 +3,48 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Seeded World Configuration
+
+### Added
+
+- Added typed `WorldConfig` settings for a 64-bit terrain seed and configurable
+  grid size, validated between 2 and 256 cells per side.
+- Added four-octave deterministic value noise so identical seeds reproduce the
+  same terrain and different seeds create different landscapes.
+- Added random world-seed generation when `world.seed` is `0`, with terminal
+  reporting and immediate persistence as `world.last_seed` for later reuse.
+
+### Changed
+
+- Migrated startup configuration from `config/evo.cfg` to
+  `config/config.json`, including the existing window and reserved network
+  settings.
+- Passed only `WorldConfig` to `GameSystem` and made terrain mesh resolution
+  follow `world.grid_size`.
+- Changed the example JSON configuration to request a random world by default.
+
+## 2026-08-20 - Orbiting Sun
+
+### Added
+
+- Added a game-owned sun that follows an elapsed-time-based vertical orbit
+  around the land.
+- Added a golden low-poly sun mesh and per-draw model transforms to render the
+  moving sun and stationary land through the same Vulkan pipeline.
+- Added directional diffuse terrain lighting driven by the sun's position.
+- Added sun-height-based daylight intensity and a smooth transition between a
+  bright daytime sky and a deep-blue nighttime sky.
+- Added a 32 x 32 procedural terrain surface with broad hills, crossing ridges,
+  smaller undulations, and subtle elevation-based soil color variation.
+
+### Changed
+
+- Extended scene submission to carry environmental sun state alongside the
+  land and camera.
+- Kept the sun emissive while applying ambient and diffuse light to terrain.
+- Replaced the flat land top with rolling terrain while retaining darker soil
+  walls and an underground-ready bottom face.
+
 ## 2026-08-20 - Visible Land Rendering
 
 ### Added

@@ -82,11 +82,11 @@ void ScreenSystem::onEvent(const Event& event) {
     }
 }
 
-void ScreenSystem::render(const Land& land) {
+void ScreenSystem::render(const Land& land, const Sun& sun) {
     if (_camera == nullptr) {
         throw std::runtime_error("ScreenSystem requires a registered camera");
     }
-    _renderer->render({.land = &land, .camera = _camera->frame()});
+    _renderer->render({.land = &land, .sun = sun, .camera = _camera->frame()});
 }
 
 void ScreenSystem::registerCamera(Camera& camera) {

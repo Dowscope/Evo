@@ -25,20 +25,39 @@ Use these controls to inspect the visible land:
 - Use the mouse wheel to zoom in and out.
 - Resizing the window automatically updates the camera viewport.
 
+### World simulation
+
+A golden low-poly sun continuously completes a vertical orbit around the land.
+It passes beneath the world during the nightward half of its cycle. Its
+direction illuminates exposed terrain faces, while its height controls daylight
+intensity and transitions the sky between bright blue and deep night blue. The
+same game-owned sun state can later drive temperature and vegetation growth.
+
 ### Configuration
 
-Edit `config/evo.cfg` before starting EVO to change startup settings:
+Edit `config/config.json` before starting EVO to change startup settings:
 
-```text
-window.title=EVO
-window.width=1280
-window.height=720
-network.address=127.0.0.1
-network.port=0
+```json
+{
+  "window.title": "EVO",
+  "window.width": 1280,
+  "window.height": 720,
+  "network.address": "127.0.0.1",
+  "network.port": 0,
+  "world.seed": 0,
+  "world.grid_size": 32
+}
 ```
 
 The network values are reserved for future networking. Invalid settings stop
 startup with an error rather than silently selecting an unexpected value.
+Set `world.seed` to `0` to create a fresh random landscape on every launch. EVO
+prints the selected seed in the terminal and immediately checkpoints it as
+`world.last_seed` in `Data/evo.save`. Copy that nonzero value back into
+`world.seed` to recreate the landscape later. Any nonzero seed always produces
+the same starting terrain. `world.grid_size` sets the number of terrain cells
+along each side and must be between 2 and 256; larger values create a smoother
+mesh but require more vertices and triangles.
 
 ### Saved progress
 
@@ -111,9 +130,16 @@ Only `ScreenSystem` owns a `RenderSystem`. The active implementation is
 be selected by `ScreenSystem`; no changes should be required in `GameSystem`,
 `EventSystem`, or the main loop.
 
-`GameSystem` creates the dirt land as a shallow block with a lighter top and
-darker soil sides, then submits it as scene data. Its thickness leaves room for
-future underground layers without involving the rendering systems.
+`GameSystem` creates the dirt land as a configurable procedural grid. Four
+octaves of seeded, smoothly interpolated value noise produce deterministic
+large landforms and smaller surface variation. Subtle height-based color
+variation helps expose the shape. Darker soil walls follow the uneven perimeter
+down to a flat bottom, preserving visible thickness for future underground
+layers.
+
+`GameSystem` also advances the sun's orbit using elapsed time. The terrain and
+sun are submitted together as scene data, without involving rendering systems
+in world generation or simulation.
 `ScreenSystem` combines that data with its registered camera frame, then passes
 the complete scene to `RenderSystem`. This keeps world creation out of the
 screen, camera, and Vulkan layers.
@@ -122,7 +148,11 @@ screen, camera, and Vulkan layers.
 rendering. It owns the graphics pipeline, depth buffer, compiled shaders,
 vertex/index buffers, command recording, synchronization, presentation, and
 swapchain recreation. The camera's view-projection matrix is supplied to the
-vertex shader each frame through a push constant.
+vertex shader each frame through a push constant. Per-draw model transforms let
+the renderer draw the stationary land and moving sun through the same pipeline.
+Sun position and intensity are included in that draw state. The fragment shader
+derives face normals, applies ambient and diffuse sunlight to terrain, and keeps
+the sun emissive so it remains bright at night.
 
 Shader sources live under `shaders/`. Both CMake and Make compile them to SPIR-V
 with `glslc`, so the Vulkan SDK shader compiler is required at build time.
@@ -142,10 +172,11 @@ destinations should be implemented inside `Logger`, without changing callers.
 ### Configuration architecture
 
 `ConfigLoader` is core startup infrastructure, not a system. It parses
-`config/evo.cfg` into typed `ApplicationConfig` data before system construction.
-`main.cpp` then passes only `WindowConfig` to `ScreenSystem`. Continue this
-pattern for future network settings: pass typed data to the system that needs
-it, and do not expose a global configuration object.
+`config/config.json` into typed `ApplicationConfig` data before system
+construction. `main.cpp` passes only `WindowConfig` to `ScreenSystem` and
+`WorldConfig` to `GameSystem`. Continue this pattern for future network settings:
+pass typed data to the system that needs it, and do not expose a global
+configuration object.
 
 ### Persistence architecture
 
@@ -153,7 +184,8 @@ it, and do not expose a global configuration object.
 registered with that interface and therefore does not know the save path or
 file format. It restores `game.update_count` as the initial continuation proof,
 updates it during runtime, checkpoints every five seconds, and records it again
-during shutdown.
+during shutdown. `GameSystem` also records `world.last_seed` immediately after
+resolving the configured seed so a randomly created landscape can be reproduced.
 
 The current key/value format is intentionally small. Before adding structured
 world state, add a save-format version and migration strategy. Keep save-format

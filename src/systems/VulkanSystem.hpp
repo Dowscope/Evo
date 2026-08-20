@@ -33,6 +33,7 @@ private:
     void _createSyncObjects();
     void _recreateSwapchain();
     void _uploadLand(const Land& land);
+    void _uploadSun();
     [[nodiscard]] Buffer _createBuffer(
         VkDeviceSize size,
         VkBufferUsageFlags usage
@@ -70,4 +71,7 @@ private:
     Buffer _vertexBuffer;
     Buffer _indexBuffer;
     std::uint32_t _indexCount = 0;
+    Buffer _sunVertexBuffer;
+    Buffer _sunIndexBuffer;
+    std::uint32_t _sunIndexCount = 0;
 };

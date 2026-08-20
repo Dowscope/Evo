@@ -19,13 +19,19 @@ user/programmer manual in `Documentation` when relevant.
 
 ## Configuration
 
-- Startup settings live in `config/evo.cfg` and are loaded by the core
+- Startup settings live in `config/config.json` and are loaded by the core
   `ConfigLoader` before systems are constructed.
 - Configuration is startup-only, read-only application data. Pass the smallest
   relevant config structure explicitly to each system; do not let systems read
   the configuration file themselves.
 - Window title and dimensions belong to `WindowConfig`. Future IP addresses and
   ports belong to `NetworkConfig`.
+- Terrain seed and grid resolution belong to `WorldConfig`, which is passed only
+  to `GameSystem`. Grid size is validated from 2 through 256. Identical seeds
+  and settings must reproduce identical starting terrain.
+- A configured world seed of `0` requests a fresh random nonzero seed. Resolve it
+  in `GameSystem` before terrain generation, log it, and immediately checkpoint
+  it as `world.last_seed`. Do not rewrite the read-only startup configuration.
 - Configuration and persistent saves are separate concerns: configuration
   describes how EVO starts, while saved data describes runtime progress.
 
@@ -106,11 +112,22 @@ or graphics implementation details directly in `main.cpp`.
 - Game logic belongs in `GameSystem`.
 - Land and other game-world objects are created and owned by `GameSystem`, then
   submitted as scene data through its registered render target.
+- The current land is a configurable deterministic procedural grid built from
+  layered seeded value noise, with rolling elevation, perimeter soil walls, and
+  a bottom face. Terrain generation remains game logic; rendering systems
+  receive completed geometry and must not generate or reshape the world.
 - A render target is explicitly registered with `GameSystem`; currently this is
   the `ScreenSystem` through the `RenderTarget` interface.
 - `GameSystem` must not know how the window or graphics backend is implemented.
 - `GameSystem` receives persistence through explicit registration and owns the
   decision about which game state must be saved.
+- The sun is game-world state owned and advanced by `GameSystem`, then submitted
+  through `Scene`. Rendering code must not own the orbit simulation. Future
+  lighting, temperature, and vegetation systems should consume this shared
+  world state through narrow registered interfaces.
+- `Sun::intensity` is derived from the sun's height by `GameSystem`. The renderer
+  consumes position and intensity for directional terrain lighting and the
+  day/night sky transition; it must not independently calculate world time.
 
 ## Persistence
 
@@ -124,6 +141,8 @@ or graphics implementation details directly in `main.cpp`.
   complex.
 - Save during orderly shutdown and at periodic checkpoints so a crash or reboot
   loses as little progress as practical.
+- Persist the resolved terrain seed as `world.last_seed`, including seeds created
+  from a configured value of `0`, so users can reproduce a generated world.
 
 ## Dependency direction
 

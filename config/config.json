@@ -1,0 +1,9 @@
+{
+  "window.title": "EVO",
+  "window.width": 1280,
+  "window.height": 720,
+  "network.address": "127.0.0.1",
+  "network.port": 0,
+  "world.seed": 0,
+  "world.grid_size": 32
+}

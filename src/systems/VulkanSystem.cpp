@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,6 +22,12 @@
 #endif
 
 namespace {
+struct DrawState {
+    glm::mat4 viewProjection;
+    glm::vec4 modelTranslation;
+    glm::vec4 sun;
+};
+
 void require(VkResult result, const char* message) {
     if (result != VK_SUCCESS) throw std::runtime_error(message);
 }
@@ -40,6 +47,12 @@ VulkanSystem::~VulkanSystem() {
         if (_indexBuffer.handle) {
             vkDestroyBuffer(_device, _indexBuffer.handle, nullptr);
             vkFreeMemory(_device, _indexBuffer.memory, nullptr);
+        }
+        if (_sunVertexBuffer.handle) {
+            vkDestroyBuffer(_device, _sunVertexBuffer.handle, nullptr);
+            vkFreeMemory(_device, _sunVertexBuffer.memory, nullptr);
+            vkDestroyBuffer(_device, _sunIndexBuffer.handle, nullptr);
+            vkFreeMemory(_device, _sunIndexBuffer.memory, nullptr);
         }
         if (_frameFence) {
             vkDestroyFence(_device, _frameFence, nullptr);
@@ -225,8 +238,10 @@ void VulkanSystem::_createPipeline() {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = static_cast<std::uint32_t>(dynamicStates.size()),
         .pDynamicStates = dynamicStates.data()};
-    const VkPushConstantRange pushConstant{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        .offset = 0, .size = sizeof(glm::mat4)};
+    constexpr VkShaderStageFlags drawStages =
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    const VkPushConstantRange pushConstant{.stageFlags = drawStages,
+        .offset = 0, .size = sizeof(DrawState)};
     const VkPipelineLayoutCreateInfo layoutInfo{.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pushConstantRangeCount = 1, .pPushConstantRanges = &pushConstant};
     require(vkCreatePipelineLayout(_device, &layoutInfo, nullptr, &_pipelineLayout),
@@ -269,7 +284,10 @@ void VulkanSystem::_createSyncObjects() {
 
 void VulkanSystem::render(const Scene& scene) {
     if (!scene.land || scene.land->indices.empty()) return;
-    if (!_indexCount) _uploadLand(*scene.land);
+    if (!_indexCount) {
+        _uploadLand(*scene.land);
+        _uploadSun();
+    }
     vkWaitForFences(_device, 1, &_frameFence, VK_TRUE, UINT64_MAX);
     std::uint32_t imageIndex;
     VkResult result = vkAcquireNextImageKHR(_device, _swapchain, UINT64_MAX,
@@ -297,7 +315,15 @@ void VulkanSystem::render(const Scene& scene) {
     vkCmdPipelineBarrier(_commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
         0, 0, nullptr, 0, nullptr, static_cast<std::uint32_t>(barriers.size()), barriers.data());
-    const VkClearValue colorClear{.color = {{0.28F, 0.62F, 0.88F, 1.0F}}};
+    const float daylight = scene.sun.intensity;
+    constexpr std::array nightSky{0.008F, 0.015F, 0.055F};
+    constexpr std::array daySky{0.28F, 0.62F, 0.88F};
+    const VkClearValue colorClear{.color = {{
+        nightSky[0] + (daySky[0] - nightSky[0]) * daylight,
+        nightSky[1] + (daySky[1] - nightSky[1]) * daylight,
+        nightSky[2] + (daySky[2] - nightSky[2]) * daylight,
+        1.0F,
+    }}};
     const VkClearValue depthClear{.depthStencil = {1.0F, 0}};
     const VkRenderingAttachmentInfo color{.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = _swapchainViews[imageIndex], .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -321,9 +347,23 @@ void VulkanSystem::render(const Scene& scene) {
     vkCmdBindVertexBuffers(_commandBuffer, 0, 1, &_vertexBuffer.handle, &offset);
     vkCmdBindIndexBuffer(_commandBuffer, _indexBuffer.handle, 0, VK_INDEX_TYPE_UINT32);
     const glm::mat4 viewProjection = scene.camera.projection * scene.camera.view;
-    vkCmdPushConstants(_commandBuffer, _pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT,
-        0, sizeof(viewProjection), &viewProjection);
+    const glm::vec4 lightingState{scene.sun.position, scene.sun.intensity};
+    const DrawState landState{viewProjection, glm::vec4{0.0F}, lightingState};
+    vkCmdPushConstants(_commandBuffer, _pipelineLayout,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        0, sizeof(landState), &landState);
     vkCmdDrawIndexed(_commandBuffer, _indexCount, 1, 0, 0, 0);
+    vkCmdBindVertexBuffers(_commandBuffer, 0, 1, &_sunVertexBuffer.handle, &offset);
+    vkCmdBindIndexBuffer(_commandBuffer, _sunIndexBuffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    const DrawState sunDrawState{
+        viewProjection,
+        glm::vec4{scene.sun.position, 1.0F},
+        glm::vec4{scene.sun.position, scene.sun.intensity},
+    };
+    vkCmdPushConstants(_commandBuffer, _pipelineLayout,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        0, sizeof(sunDrawState), &sunDrawState);
+    vkCmdDrawIndexed(_commandBuffer, _sunIndexCount, 1, 0, 0, 0);
     vkCmdEndRendering(_commandBuffer);
     const VkImageMemoryBarrier presentBarrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
@@ -362,6 +402,35 @@ void VulkanSystem::_uploadLand(const Land& land) {
     std::memcpy(data, land.indices.data(), indexSize);
     vkUnmapMemory(_device, _indexBuffer.memory);
     _indexCount = static_cast<std::uint32_t>(land.indices.size());
+}
+
+void VulkanSystem::_uploadSun() {
+    constexpr glm::vec3 sunlight{1.0F, 0.82F, 0.18F};
+    constexpr float radius = 0.7F;
+    const std::array vertices{
+        Vertex{{0.0F, radius, 0.0F}, sunlight},
+        Vertex{{radius, 0.0F, 0.0F}, sunlight},
+        Vertex{{0.0F, 0.0F, radius}, sunlight},
+        Vertex{{-radius, 0.0F, 0.0F}, sunlight},
+        Vertex{{0.0F, 0.0F, -radius}, sunlight},
+        Vertex{{0.0F, -radius, 0.0F}, sunlight},
+    };
+    constexpr std::array<std::uint32_t, 24> indices{
+        0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1,
+        5, 2, 1, 5, 3, 2, 5, 4, 3, 5, 1, 4,
+    };
+    const VkDeviceSize vertexSize = sizeof(vertices);
+    const VkDeviceSize indexSize = sizeof(indices);
+    _sunVertexBuffer = _createBuffer(vertexSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    _sunIndexBuffer = _createBuffer(indexSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    void* data = nullptr;
+    vkMapMemory(_device, _sunVertexBuffer.memory, 0, vertexSize, 0, &data);
+    std::memcpy(data, vertices.data(), vertexSize);
+    vkUnmapMemory(_device, _sunVertexBuffer.memory);
+    vkMapMemory(_device, _sunIndexBuffer.memory, 0, indexSize, 0, &data);
+    std::memcpy(data, indices.data(), indexSize);
+    vkUnmapMemory(_device, _sunIndexBuffer.memory);
+    _sunIndexCount = static_cast<std::uint32_t>(indices.size());
 }
 
 VulkanSystem::Buffer VulkanSystem::_createBuffer(VkDeviceSize size, VkBufferUsageFlags usage) const {

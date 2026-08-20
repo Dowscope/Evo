@@ -15,7 +15,7 @@ struct GLFWwindow;
 class RenderTarget {
 public:
     virtual ~RenderTarget() = default;
-    virtual void render(const Land& land) = 0;
+    virtual void render(const Land& land, const Sun& sun) = 0;
 };
 
 class ScreenSystem final : public System,
@@ -30,7 +30,7 @@ public:
     void setEventCallback(EventCallback callback) override;
     void pollEvents() override;
     void onEvent(const Event& event) override;
-    void render(const Land& land) override;
+    void render(const Land& land, const Sun& sun) override;
     void registerCamera(Camera& camera);
 
     [[nodiscard]] bool shouldClose() const;

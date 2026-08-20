@@ -19,13 +19,13 @@ std::unique_ptr<GameSystem> gameSystem;
 std::unique_ptr<SaveSystem> saveSystem;
 
 void init() {
-    const ApplicationConfig config = ConfigLoader::load("config/evo.cfg");
+    const ApplicationConfig config = ConfigLoader::load("config/config.json");
 
     eventSystem = std::make_unique<EventSystem>();
     cameraSystem = std::make_unique<CameraSystem>();
     saveSystem = std::make_unique<SaveSystem>("Data/evo.save");
     screenSystem = std::make_unique<ScreenSystem>(config.window);
-    gameSystem = std::make_unique<GameSystem>();
+    gameSystem = std::make_unique<GameSystem>(config.world);
 
     eventSystem->init();
     cameraSystem->init();
