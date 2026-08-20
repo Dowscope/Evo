@@ -4,6 +4,7 @@ project(EVO VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 3.3 REQUIRED)
+find_package(OpenGL REQUIRED)
 find_program(GLSLC glslc REQUIRED)
 
 set(SHADER_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/shaders")
@@ -32,6 +33,7 @@ add_executable(EVO
     src/systems/ScreenSystem.cpp
     src/systems/SaveSystem.cpp
     src/systems/SunSystem.cpp
+    src/systems/SurfaceTemperatureSystem.cpp
     src/systems/TerrainAnalysisSystem.cpp
     src/systems/TerrainGenerationSystem.cpp
     src/systems/TerrainMeshSystem.cpp
@@ -42,7 +44,7 @@ add_executable(EVO
 
 target_compile_features(EVO PRIVATE cxx_std_23)
 target_include_directories(EVO PRIVATE src)
-target_link_libraries(EVO PRIVATE Vulkan::Vulkan glfw)
+target_link_libraries(EVO PRIVATE Vulkan::Vulkan glfw OpenGL::GL)
 target_compile_definitions(EVO PRIVATE EVO_SHADER_DIR="${SHADER_OUTPUT_DIR}")
 add_dependencies(EVO EvoShaders)
 

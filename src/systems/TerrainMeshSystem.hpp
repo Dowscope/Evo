@@ -5,7 +5,7 @@
 
 class TerrainMeshSystem final : public System, public TerrainMeshing {
 public:
-    TerrainMeshSystem();
+    explicit TerrainMeshSystem(SoilThermalConfig soilConfig);
 
     void init() override;
     bool updateTerrainMesh(
@@ -24,4 +24,13 @@ private:
         std::uint32_t vertexX,
         std::uint32_t vertexZ
     );
+    [[nodiscard]] static float _vertexTemperature(
+        const WorldConfig& config,
+        const Registry& registry,
+        std::span<const Entity> terrainEntities,
+        std::uint32_t vertexX,
+        std::uint32_t vertexZ
+    );
+
+    SoilThermalConfig _soilConfig;
 };

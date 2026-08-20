@@ -2,6 +2,7 @@
 
 enum class EventType {
     EscapePressed,
+    TemperatureOverlayToggled,
     WindowCloseRequested,
     MouseMoved,
     MouseButtonPressed,

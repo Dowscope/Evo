@@ -11,6 +11,7 @@
 #include "systems/TerrainAnalysisSystem.hpp"
 #include "systems/TerrainGenerationSystem.hpp"
 #include "systems/TerrainMeshSystem.hpp"
+#include "systems/SurfaceTemperatureSystem.hpp"
 
 #include <cstdlib>
 #include <exception>
@@ -25,6 +26,7 @@ std::unique_ptr<SunSystem> sunSystem;
 std::unique_ptr<TerrainAnalysisSystem> terrainAnalysisSystem;
 std::unique_ptr<TerrainGenerationSystem> terrainGenerationSystem;
 std::unique_ptr<TerrainMeshSystem> terrainMeshSystem;
+std::unique_ptr<SurfaceTemperatureSystem> surfaceTemperatureSystem;
 std::unique_ptr<CameraSystem> cameraSystem;
 std::unique_ptr<ScreenSystem> screenSystem;
 std::unique_ptr<GameSystem> gameSystem;
@@ -38,8 +40,15 @@ void init() {
     chunkSimulationSystem = std::make_unique<ChunkSimulationSystem>();
     sunSystem = std::make_unique<SunSystem>(config.world);
     terrainAnalysisSystem = std::make_unique<TerrainAnalysisSystem>(config.world);
-    terrainGenerationSystem = std::make_unique<TerrainGenerationSystem>();
-    terrainMeshSystem = std::make_unique<TerrainMeshSystem>();
+    terrainGenerationSystem = std::make_unique<TerrainGenerationSystem>(
+        config.climate,
+        config.soil
+    );
+    terrainMeshSystem = std::make_unique<TerrainMeshSystem>(config.soil);
+    surfaceTemperatureSystem = std::make_unique<SurfaceTemperatureSystem>(
+        config.climate,
+        config.soil
+    );
     cameraSystem = std::make_unique<CameraSystem>();
     saveSystem = std::make_unique<SaveSystem>("Data/evo.save");
     screenSystem = std::make_unique<ScreenSystem>(config.window);
@@ -52,6 +61,7 @@ void init() {
     terrainAnalysisSystem->init();
     terrainGenerationSystem->init();
     terrainMeshSystem->init();
+    surfaceTemperatureSystem->init();
     cameraSystem->init();
     saveSystem->init();
     screenSystem->init();
@@ -61,7 +71,9 @@ void init() {
     eventSystem->registerListener(*cameraSystem);
     screenSystem->registerCamera(*cameraSystem);
     screenSystem->registerClock(*timeSystem);
+    screenSystem->registerTemperatureStatistics(*surfaceTemperatureSystem);
     chunkSimulationSystem->registerTickSystem(*terrainAnalysisSystem);
+    chunkSimulationSystem->registerTickSystem(*surfaceTemperatureSystem);
     gameSystem->registerRenderTarget(*screenSystem);
     gameSystem->registerPersistence(*saveSystem);
     gameSystem->registerClock(*timeSystem);
@@ -69,6 +81,7 @@ void init() {
     gameSystem->registerSunSimulation(*sunSystem);
     gameSystem->registerTerrainGeneration(*terrainGenerationSystem);
     gameSystem->registerTerrainMeshing(*terrainMeshSystem);
+    gameSystem->registerSurfaceTemperature(*surfaceTemperatureSystem);
     gameSystem->init();
 }
 
@@ -95,6 +108,7 @@ void shutdown() {
         saveSystem->flush();
     }
     screenSystem.reset();
+    surfaceTemperatureSystem.reset();
     terrainMeshSystem.reset();
     terrainGenerationSystem.reset();
     terrainAnalysisSystem.reset();

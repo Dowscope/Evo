@@ -1,7 +1,7 @@
 CXX ?= c++
 CXXFLAGS ?= -std=c++23 -O2 -Wall -Wextra -Wpedantic -Wno-missing-field-initializers
 CPPFLAGS ?= $(shell pkg-config --cflags glfw3 vulkan)
-LDLIBS ?= $(shell pkg-config --libs glfw3 vulkan)
+LDLIBS ?= $(shell pkg-config --libs glfw3 vulkan gl)
 
 TARGET := EVO
 SOURCES := $(shell find src -name '*.cpp' -print)

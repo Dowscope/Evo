@@ -4,8 +4,12 @@
 
 #include <cmath>
 
-TerrainGenerationSystem::TerrainGenerationSystem()
-    : System("Terrain Generation") {}
+TerrainGenerationSystem::TerrainGenerationSystem(
+    ClimateConfig climateConfig,
+    SoilThermalConfig soilConfig
+) : System("Terrain Generation"),
+    _climateConfig(climateConfig),
+    _soilConfig(soilConfig) {}
 
 void TerrainGenerationSystem::init() {
     System::init();
@@ -53,6 +57,18 @@ void TerrainGenerationSystem::generateTerrain(
                     registry.emplace<Slope>(entity);
                     registry.emplace<Aspect>(entity);
                     registry.emplace<Drainage>(entity);
+                    registry.emplace<SurfaceTemperature>(
+                        entity, _climateConfig.airTemperatureCelsius
+                    );
+                    registry.emplace<SoilTemperatureProfile>(
+                        entity,
+                        std::array<float, SoilTemperatureProfile::layerCount>{
+                            _soilConfig.initialTemperatureCelsius,
+                            _soilConfig.initialTemperatureCelsius,
+                            _soilConfig.initialTemperatureCelsius,
+                            _soilConfig.initialTemperatureCelsius,
+                        }
+                    );
                     chunk.terrainCells.push_back(entity);
                     terrainEntities[globalZ * totalCellsX + globalX] = entity;
                 }

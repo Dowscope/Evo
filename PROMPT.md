@@ -33,8 +33,16 @@ user/programmer manual in `Documentation` when relevant.
   starting terrain.
 - Fixed-step duration and initial time scale belong to `TimeConfig`, which is
   passed only to `TimeSystem`. Fixed steps must be positive and no longer than
-  10 seconds; time scale is validated from 0 through 1000. Positive configured
-  day length defines one solar orbit in simulation seconds.
+  3600 seconds; time scale is validated from 0 through 100000. Positive
+  configured day length defines one solar orbit in simulation seconds. Defaults
+  use physical seconds: a 60-second tick and an 86400-second day, accelerated by
+  a time scale of 1440.
+- Air temperature, solar irradiance, surface absorptivity, areal heat capacity,
+  surface heat-transfer coefficient, emissivity, and effective sky temperature
+  belong to `ClimateConfig`. Soil initial and deep temperatures, conductivity,
+  volumetric heat capacity, surface conductance, layer thicknesses, and
+  deep-boundary depth belong to `SoilThermalConfig`. Preserve their documented
+  units and validation when extending the energy model.
 - A configured world seed of `0` requests a fresh random nonzero seed. Resolve it
   in `GameSystem` before terrain generation, log it, and immediately checkpoint
   it as `world.last_seed`. Do not rewrite the read-only startup configuration.
@@ -102,10 +110,14 @@ this order so every consumer observes the current frame's timing snapshot.
 - `ScreenSystem` is the only top-level system responsible for window creation
   and anything presented to the screen.
 - `ScreenSystem` owns both the main game window and the compact stats window.
-  The stats window displays the current day in its title and receives timing
-  only through an explicitly registered `Clock` interface.
+  The stats window renders the current day, average surface temperature, and
+  overlay state in its content area and receives timing only through an
+  explicitly registered `Clock` interface.
 - `ScreenSystem` alone declares, owns, initializes, and accesses the rendering
   backend.
+- The main scene remains Vulkan-rendered. The auxiliary stats presentation may
+  use its own OpenGL context, but all of its calls and built-in text rendering
+  remain confined to `ScreenSystem`.
 - All Vulkan types, calls, and lifetime management belong in `VulkanSystem`.
   No other system may include Vulkan headers.
 - `VulkanSystem` owns the surface, device and presentation selection, swapchain,
@@ -146,7 +158,9 @@ this order so every consumer observes the current frame's timing snapshot.
   data through its registered render target.
 - `TerrainGenerationSystem` creates the configurable deterministic grid and ECS
   components from layered seeded value noise. `TerrainMeshSystem` derives the
-  rolling surface, perimeter walls, and bottom render geometry. Vulkan receives
+  rolling surface, four configured-thickness perimeter strata, and bottom render
+  geometry. Stratum interfaces follow local surface elevation, and their colors
+  are presentation metadata rather than simulated composition. Vulkan receives
   completed geometry and must not generate or reshape the world.
 - A render target is explicitly registered with `GameSystem`; currently this is
   the `ScreenSystem` through the `RenderTarget` interface.
@@ -160,6 +174,12 @@ this order so every consumer observes the current frame's timing snapshot.
   and world dimensions. The renderer consumes those values for directional
   terrain lighting and the day/night sky transition; it must not independently
   calculate world time.
+- `Sun::position` places the visible representation near the modeled world;
+  `Sun::direction` represents effectively parallel physical solar rays. Lighting
+  and thermal systems use direction, never distance to the display mesh.
+- `SurfaceTemperatureSystem` receives current sun state through the narrow
+  `SurfaceTemperatureSimulation` interface and participates in fixed chunk
+  ticks after terrain analysis.
 
 ## ECS and world chunks
 
@@ -169,8 +189,10 @@ this order so every consumer observes the current frame's timing snapshot.
   lookup. Do not add behavior, inheritance, or rendering calls to components.
 - Every terrain cell is an entity with `GridPosition`, `ChunkPosition`, and
   meter-valued `Elevation`, plus derived `Slope`, `Aspect`, and `Drainage`
-  components. Add environmental components only after their units, inputs, and
-  update model are defined; do not seed arbitrary biological stats.
+  components plus Celsius-valued `SurfaceTemperature` and a four-layer
+  `SoilTemperatureProfile`. Add environmental components only after their
+  units, inputs, and update model are defined; do not seed arbitrary biological
+  stats.
 - The world is partitioned into configurable square chunks. Each chunk owns the
   IDs of its terrain cells and scheduling metadata, not duplicate cell state.
 - The default world is a 2 x 2 layout of 16 x 16 chunks using one-meter cells.
@@ -184,6 +206,27 @@ this order so every consumer observes the current frame's timing snapshot.
 - Terrain analysis and mesh rebuilding use separate per-chunk dirty flags.
   Elevation-changing systems must mark both. `TerrainMeshSystem` increments the
   land revision after rebuilding; Vulkan re-uploads only changed revisions.
+- Surface temperature uses an explicit areal energy balance: absorbed shortwave
+  solar power minus linear sensible heat exchange with configured air and net
+  Stefan-Boltzmann longwave exchange with the effective sky, integrated over the
+  fixed step and divided by areal heat capacity. Convert Celsius to kelvin for
+  the fourth-power term. Solar incidence comes from slope/aspect and sun
+  direction. Do not describe this limited model as a complete climate or
+  soil-temperature model.
+- Soil conduction uses four configured-thickness thermal cells. Calculate every
+  internal flux from the same pre-tick temperature snapshot and transfer equal
+  and opposite energy between adjacent cells. Derive each layer's areal heat
+  capacity from volumetric capacity and thickness. The deepest cell exchanges
+  heat with the configured stable deep-ground boundary; do not silently turn it
+  into an insulated boundary.
+- Pressing T toggles only the render overlay. Its fixed -10 °C to 50 °C color
+  scale must not feed back into ECS simulation state.
+- Both GLFW windows register the shared key callback because either may own
+  keyboard focus. The stats content mirrors overlay state as input confirmation.
+- `SurfaceTemperatureSystem` calculates whole-world average surface temperature
+  after local chunk updates and exposes it through the read-only
+  `SurfaceTemperatureStatistics` interface. `ScreenSystem` displays one decimal
+  place and must not derive or mutate simulation statistics itself.
 - Chunk simulation must be deterministic and chunk-local before parallelism is
   introduced. Exchange cross-boundary effects in a distinct synchronization
   phase to avoid order-dependent results.
@@ -222,6 +265,9 @@ main.cpp registers systems
     GameSystem  -> TerrainGeneration interface          <- TerrainGenerationSystem
     GameSystem  -> TerrainMeshing interface             <- TerrainMeshSystem
     ChunkSimulationSystem -> ChunkTickSystem            <- TerrainAnalysisSystem
+    ChunkSimulationSystem -> ChunkTickSystem            <- SurfaceTemperatureSystem
+    GameSystem -> SurfaceTemperatureSimulation          <- SurfaceTemperatureSystem
+    ScreenSystem -> SurfaceTemperatureStatistics        <- SurfaceTemperatureSystem
     ScreenSystem -> Camera interface                     <- CameraSystem
     ScreenSystem -> Clock interface                      <- TimeSystem
     ScreenSystem -> RenderSystem                        <- VulkanSystem

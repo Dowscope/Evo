@@ -11,6 +11,7 @@
 class RenderSystem;
 class Camera;
 class Clock;
+class SurfaceTemperatureStatistics;
 struct GLFWwindow;
 
 class RenderTarget {
@@ -34,6 +35,9 @@ public:
     void render(const Land& land, const Sun& sun) override;
     void registerCamera(Camera& camera);
     void registerClock(Clock& clock);
+    void registerTemperatureStatistics(
+        SurfaceTemperatureStatistics& statistics
+    );
 
     [[nodiscard]] bool shouldClose() const;
 
@@ -57,7 +61,7 @@ private:
     static void _handleFramebufferSize(GLFWwindow* window, int width, int height);
 
     void _emit(Event event) const;
-    void _updateStatsWindow();
+    void _renderStatsWindow();
 
     GLFWwindow* _window = nullptr;
     GLFWwindow* _statsWindow = nullptr;
@@ -66,5 +70,6 @@ private:
     std::unique_ptr<RenderSystem> _renderer;
     Camera* _camera = nullptr;
     Clock* _clock = nullptr;
-    std::uint64_t _displayedDay = 0;
+    SurfaceTemperatureStatistics* _temperatureStatistics = nullptr;
+    bool _temperatureOverlay = false;
 };

@@ -3,6 +3,53 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-20 - Solar Surface Temperature
+
+### Added
+
+- Added per-cell Celsius surface temperature and a fixed-tick surface energy
+  system driven by slope-dependent solar incidence.
+- Added configurable air temperature, solar irradiance, absorptivity, areal heat
+  capacity, and sensible heat-transfer coefficient with explicit units.
+- Added a T-key surface-temperature overlay using a blue-to-red -10 °C to 50 °C
+  visual scale.
+- Added an in-window stats panel with built-in bitmap text for day, average
+  surface temperature, and temperature-overlay state.
+- Added an ECS-owned four-layer soil temperature profile with configurable layer
+  thicknesses, initial and deep-ground temperatures, conductivity, volumetric
+  heat capacity, surface conductance, and deep-boundary depth.
+- Added four naturally colored perimeter strata that visualize the configured
+  thermal soil-layer thicknesses beneath the rolling surface.
+- Added configurable surface emissivity and effective sky temperature for
+  continuous thermal-infrared exchange.
+
+### Changed
+
+- Changed default timing to physical simulation seconds: one-minute fixed ticks,
+  86400-second days, and 1440x acceleration for a 60-real-second day.
+- Extended terrain mesh vertices and revisions to carry averaged ECS surface
+  temperature to Vulkan without making render data authoritative.
+- Routed the overlay toggle through `EventSystem` and kept it presentation-only.
+- Separated parallel physical sunlight direction from the nearby visual sun
+  position to prevent artificial parallax across the terrain.
+- Registered T-key handling on both the game and stats windows so the overlay
+  toggles regardless of which window has keyboard focus.
+- Moved stats out of the native title bar and into the stats window's content
+  area, leaving a fixed `EVO Stats` title.
+- Added whole-world average surface temperature calculation after each fixed
+  tick and displayed it to one decimal degree Celsius in the stats panel.
+- Added a read-only `SurfaceTemperatureStatistics` interface between the
+  temperature and screen systems.
+- Linked OpenGL for the auxiliary stats window while keeping the world renderer
+  on Vulkan.
+- Coupled the surface, adjacent soil layers, and stable deep-ground boundary on
+  every fixed simulation tick; internal layer transfers conserve energy and use
+  a common pre-tick snapshot to avoid update-order artifacts.
+- Changed the terrain bottom and layer interfaces to follow local surface
+  elevation, preserving a coherent block profile across rolling terrain.
+- Extended the surface energy balance with net Stefan-Boltzmann longwave
+  radiation using absolute temperature.
+
 ## 2026-08-20 - Terrain ECS Systems
 
 ### Added

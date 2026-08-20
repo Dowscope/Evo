@@ -6,6 +6,7 @@
 #include "simulation/SunSimulation.hpp"
 #include "simulation/TerrainGeneration.hpp"
 #include "simulation/TerrainMeshing.hpp"
+#include "simulation/SurfaceTemperatureSimulation.hpp"
 #include "systems/ScreenSystem.hpp"
 #include "time/Clock.hpp"
 
@@ -27,7 +28,8 @@ GameSystem::~GameSystem() {
 void GameSystem::init() {
     if (_renderTarget == nullptr || _persistence == nullptr || _clock == nullptr ||
         _chunkSimulation == nullptr || _sunSimulation == nullptr ||
-        _terrainGeneration == nullptr || _terrainMeshing == nullptr) {
+        _terrainGeneration == nullptr || _terrainMeshing == nullptr ||
+        _surfaceTemperature == nullptr) {
         throw std::runtime_error(
             "GameSystem is missing one or more registered dependencies"
         );
@@ -80,9 +82,16 @@ void GameSystem::registerTerrainMeshing(TerrainMeshing& meshing) {
     _terrainMeshing = &meshing;
 }
 
+void GameSystem::registerSurfaceTemperature(
+    SurfaceTemperatureSimulation& surfaceTemperature
+) {
+    _surfaceTemperature = &surfaceTemperature;
+}
+
 void GameSystem::update() {
     const TimeFrame& time = _clock->frame();
     _sunSimulation->updateSun(_sun, time);
+    _surfaceTemperature->setSunState(_sun);
     _chunkSimulation->simulate(_registry, _chunks, time);
     _terrainMeshing->updateTerrainMesh(
         _config, _registry, _chunks, _terrainEntities, _land

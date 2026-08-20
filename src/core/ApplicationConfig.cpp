@@ -136,6 +136,50 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
             config.time.timeScale = parseNumber<double>(value, key);
         } else if (key == "time.day_length_seconds") {
             config.time.dayLengthSeconds = parseNumber<double>(value, key);
+        } else if (key == "climate.air_temperature_celsius") {
+            config.climate.airTemperatureCelsius = parseNumber<float>(value, key);
+        } else if (key == "climate.solar_irradiance_w_m2") {
+            config.climate.solarIrradianceWattsPerSquareMeter =
+                parseNumber<float>(value, key);
+        } else if (key == "climate.surface_absorptivity") {
+            config.climate.surfaceAbsorptivity = parseNumber<float>(value, key);
+        } else if (key == "climate.surface_heat_capacity_j_m2_k") {
+            config.climate.surfaceHeatCapacityJoulesPerSquareMeterKelvin =
+                parseNumber<float>(value, key);
+        } else if (key == "climate.surface_heat_transfer_w_m2_k") {
+            config.climate.surfaceHeatTransferWattsPerSquareMeterKelvin =
+                parseNumber<float>(value, key);
+        } else if (key == "climate.surface_emissivity") {
+            config.climate.surfaceEmissivity = parseNumber<float>(value, key);
+        } else if (key == "climate.effective_sky_temperature_celsius") {
+            config.climate.effectiveSkyTemperatureCelsius =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.initial_temperature_celsius") {
+            config.soil.initialTemperatureCelsius =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.deep_ground_temperature_celsius") {
+            config.soil.deepGroundTemperatureCelsius =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.thermal_conductivity_w_m_k") {
+            config.soil.thermalConductivityWattsPerMeterKelvin =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.volumetric_heat_capacity_j_m3_k") {
+            config.soil.volumetricHeatCapacityJoulesPerCubicMeterKelvin =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.surface_conductance_w_m2_k") {
+            config.soil.surfaceConductanceWattsPerSquareMeterKelvin =
+                parseNumber<float>(value, key);
+        } else if (key == "soil.layer_1_thickness_m") {
+            config.soil.layerThicknessMeters[0] = parseNumber<float>(value, key);
+        } else if (key == "soil.layer_2_thickness_m") {
+            config.soil.layerThicknessMeters[1] = parseNumber<float>(value, key);
+        } else if (key == "soil.layer_3_thickness_m") {
+            config.soil.layerThicknessMeters[2] = parseNumber<float>(value, key);
+        } else if (key == "soil.layer_4_thickness_m") {
+            config.soil.layerThicknessMeters[3] = parseNumber<float>(value, key);
+        } else if (key == "soil.deep_boundary_depth_m") {
+            config.soil.deepBoundaryDepthMeters =
+                parseNumber<float>(value, key);
         }
     }
 
@@ -163,18 +207,113 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
     }
     if (!std::isfinite(config.time.fixedStepSeconds) ||
         config.time.fixedStepSeconds <= 0.0 ||
-        config.time.fixedStepSeconds > 10.0) {
+        config.time.fixedStepSeconds > 3600.0) {
         throw std::runtime_error(
-            "time.fixed_step_seconds must be greater than 0 and at most 10"
+            "time.fixed_step_seconds must be greater than 0 and at most 3600"
         );
     }
     if (!std::isfinite(config.time.timeScale) || config.time.timeScale < 0.0 ||
-        config.time.timeScale > 1000.0) {
-        throw std::runtime_error("time.scale must be between 0 and 1000");
+        config.time.timeScale > 100000.0) {
+        throw std::runtime_error("time.scale must be between 0 and 100000");
     }
     if (!std::isfinite(config.time.dayLengthSeconds) ||
         config.time.dayLengthSeconds <= 0.0) {
         throw std::runtime_error("time.day_length_seconds must be positive");
+    }
+    if (!std::isfinite(config.climate.airTemperatureCelsius) ||
+        config.climate.airTemperatureCelsius < -100.0F ||
+        config.climate.airTemperatureCelsius > 100.0F) {
+        throw std::runtime_error(
+            "climate.air_temperature_celsius must be between -100 and 100"
+        );
+    }
+    if (!std::isfinite(config.climate.solarIrradianceWattsPerSquareMeter) ||
+        config.climate.solarIrradianceWattsPerSquareMeter < 0.0F ||
+        config.climate.solarIrradianceWattsPerSquareMeter > 2000.0F) {
+        throw std::runtime_error(
+            "climate.solar_irradiance_w_m2 must be between 0 and 2000"
+        );
+    }
+    if (!std::isfinite(config.climate.surfaceAbsorptivity) ||
+        config.climate.surfaceAbsorptivity < 0.0F ||
+        config.climate.surfaceAbsorptivity > 1.0F) {
+        throw std::runtime_error(
+            "climate.surface_absorptivity must be between 0 and 1"
+        );
+    }
+    if (!std::isfinite(
+            config.climate.surfaceHeatCapacityJoulesPerSquareMeterKelvin
+        ) || config.climate.surfaceHeatCapacityJoulesPerSquareMeterKelvin <= 0.0F) {
+        throw std::runtime_error(
+            "climate.surface_heat_capacity_j_m2_k must be positive"
+        );
+    }
+    if (!std::isfinite(
+            config.climate.surfaceHeatTransferWattsPerSquareMeterKelvin
+        ) || config.climate.surfaceHeatTransferWattsPerSquareMeterKelvin < 0.0F) {
+        throw std::runtime_error(
+            "climate.surface_heat_transfer_w_m2_k must be non-negative"
+        );
+    }
+    if (!std::isfinite(config.climate.surfaceEmissivity) ||
+        config.climate.surfaceEmissivity < 0.0F ||
+        config.climate.surfaceEmissivity > 1.0F) {
+        throw std::runtime_error(
+            "climate.surface_emissivity must be between 0 and 1"
+        );
+    }
+    if (!std::isfinite(config.climate.effectiveSkyTemperatureCelsius) ||
+        config.climate.effectiveSkyTemperatureCelsius <= -273.15F ||
+        config.climate.effectiveSkyTemperatureCelsius > 100.0F) {
+        throw std::runtime_error(
+            "climate.effective_sky_temperature_celsius must be above absolute zero and at most 100"
+        );
+    }
+    if (!std::isfinite(config.soil.initialTemperatureCelsius) ||
+        config.soil.initialTemperatureCelsius < -100.0F ||
+        config.soil.initialTemperatureCelsius > 100.0F) {
+        throw std::runtime_error(
+            "soil.initial_temperature_celsius must be between -100 and 100"
+        );
+    }
+    if (!std::isfinite(config.soil.deepGroundTemperatureCelsius) ||
+        config.soil.deepGroundTemperatureCelsius < -100.0F ||
+        config.soil.deepGroundTemperatureCelsius > 100.0F) {
+        throw std::runtime_error(
+            "soil.deep_ground_temperature_celsius must be between -100 and 100"
+        );
+    }
+    if (!std::isfinite(config.soil.thermalConductivityWattsPerMeterKelvin) ||
+        config.soil.thermalConductivityWattsPerMeterKelvin < 0.0F) {
+        throw std::runtime_error(
+            "soil.thermal_conductivity_w_m_k must be non-negative"
+        );
+    }
+    if (!std::isfinite(
+            config.soil.volumetricHeatCapacityJoulesPerCubicMeterKelvin
+        ) || config.soil.volumetricHeatCapacityJoulesPerCubicMeterKelvin <= 0.0F) {
+        throw std::runtime_error(
+            "soil.volumetric_heat_capacity_j_m3_k must be positive"
+        );
+    }
+    if (!std::isfinite(config.soil.surfaceConductanceWattsPerSquareMeterKelvin) ||
+        config.soil.surfaceConductanceWattsPerSquareMeterKelvin < 0.0F) {
+        throw std::runtime_error(
+            "soil.surface_conductance_w_m2_k must be non-negative"
+        );
+    }
+    float modeledSoilDepthMeters = 0.0F;
+    for (const float thicknessMeters : config.soil.layerThicknessMeters) {
+        if (!std::isfinite(thicknessMeters) || thicknessMeters <= 0.0F) {
+            throw std::runtime_error("soil layer thicknesses must be positive");
+        }
+        modeledSoilDepthMeters += thicknessMeters;
+    }
+    if (!std::isfinite(config.soil.deepBoundaryDepthMeters) ||
+        config.soil.deepBoundaryDepthMeters <= modeledSoilDepthMeters) {
+        throw std::runtime_error(
+            "soil.deep_boundary_depth_m must be below all modeled soil layers"
+        );
     }
     return config;
 }

@@ -16,10 +16,11 @@ make run
 EVO opens in a 1280 x 720 window. Press Escape or use the window close button
 to exit.
 
-EVO also opens a compact, non-resizable stats window. Its title displays the
-current simulation day, beginning with `EVO Stats - Day 1`. The counter follows
-simulation time, so it stops while simulation time is paused and responds to
-the configured time scale.
+EVO also opens a compact, non-resizable window titled `EVO Stats`. Its content
+area displays the current simulation day, whole-world average surface
+temperature rounded to one decimal degree Celsius, and temperature-overlay
+state. The day counter follows simulation time, so it stops while simulation
+time is paused and responds to the configured time scale.
 
 ### Camera controls
 
@@ -29,6 +30,10 @@ Use these controls to inspect the visible land:
 - Hold the middle mouse button and drag to pan across the land.
 - Use the mouse wheel to zoom in and out.
 - Resizing the window automatically updates the camera viewport.
+- Press T to toggle the surface-temperature overlay. Blue represents colder
+  surfaces and the scale progresses through cyan and yellow to red for hotter
+  surfaces. The shortcut works while either EVO window has focus, and the stats
+  window reports `OVERLAY: ON` or `OVERLAY: OFF` in its content area.
 
 ### World simulation
 
@@ -36,7 +41,7 @@ A golden low-poly sun continuously completes a vertical orbit around the land.
 It passes beneath the world during the nightward half of its cycle. Its
 direction illuminates exposed terrain faces, while its height controls daylight
 intensity and transitions the sky between bright blue and deep night blue. The
-same game-owned sun state can later drive temperature and vegetation growth.
+same sun state drives cell-level surface heating.
 
 ### Configuration
 
@@ -54,9 +59,26 @@ Edit `config/config.json` before starting EVO to change startup settings:
   "world.chunks_x": 2,
   "world.chunks_z": 2,
   "world.cell_size_meters": 1.0,
-  "time.fixed_step_seconds": 0.1,
-  "time.scale": 1.0,
-  "time.day_length_seconds": 60.0
+  "time.fixed_step_seconds": 60.0,
+  "time.scale": 1440.0,
+  "time.day_length_seconds": 86400.0,
+  "climate.air_temperature_celsius": 15.0,
+  "climate.solar_irradiance_w_m2": 1000.0,
+  "climate.surface_absorptivity": 0.75,
+  "climate.surface_heat_capacity_j_m2_k": 200000.0,
+  "climate.surface_heat_transfer_w_m2_k": 10.0,
+  "climate.surface_emissivity": 0.95,
+  "climate.effective_sky_temperature_celsius": -5.0,
+  "soil.initial_temperature_celsius": 15.0,
+  "soil.deep_ground_temperature_celsius": 12.0,
+  "soil.thermal_conductivity_w_m_k": 1.0,
+  "soil.volumetric_heat_capacity_j_m3_k": 2000000.0,
+  "soil.surface_conductance_w_m2_k": 5.0,
+  "soil.layer_1_thickness_m": 0.1,
+  "soil.layer_2_thickness_m": 0.2,
+  "soil.layer_3_thickness_m": 0.5,
+  "soil.layer_4_thickness_m": 1.2,
+  "soil.deep_boundary_depth_m": 3.0
 }
 ```
 
@@ -72,11 +94,25 @@ each square chunk and must be between 2 and 64. `world.chunks_x` and
 `world.cell_size_meters` defines physical cell width and must be between 0.1 and
 100 meters. The defaults create four 16 x 16 chunks and a 32 x 32 meter world.
 `time.fixed_step_seconds` defines deterministic simulation tick duration and
-must be greater than zero and at most 10 seconds. `time.scale` multiplies
+must be greater than zero and at most 3600 seconds. `time.scale` multiplies
 simulation time without changing real-time clocks and must be between 0 and
-1000. A scale of zero stops simulation time.
+100000. A scale of zero stops simulation time.
 `time.day_length_seconds` defines one complete simulated day and sun orbit in
-simulation seconds and must be positive. The default is 60 seconds.
+simulation seconds and must be positive. The default is 86400 seconds, matching
+24 hours. A scale of 1440 makes that day pass in 60 real seconds while each
+fixed tick represents one simulated minute.
+
+Climate values use explicit SI-derived units. Air temperature is in degrees
+Celsius, solar irradiance in watts per square meter, surface heat capacity in
+joules per square meter per kelvin, and surface heat transfer in watts per
+square meter per kelvin. Soil conductivity is in watts per meter per kelvin and
+volumetric heat capacity is in joules per cubic meter per kelvin. Layer
+thickness and deep-boundary depth are in meters; the boundary must be deeper
+than the combined layer thickness. Surface conductance is in watts per square
+meter per kelvin. Absorptivity is dimensionless from zero through one.
+Surface emissivity is also dimensionless from zero through one. Effective sky
+temperature represents incoming atmospheric infrared radiation as an equivalent
+blackbody temperature; it is not the local air temperature.
 
 ### Saved progress
 
@@ -139,6 +175,8 @@ This keeps implementations replaceable and makes dependencies visible in
   chunks as a registered fixed-tick processor.
 - `TerrainMeshSystem` rebuilds revisioned render geometry only when a chunk marks
   its terrain mesh dirty.
+- `SurfaceTemperatureSystem` applies solar energy and sensible heat exchange to
+  every active terrain cell as a fixed-tick ECS processor.
 - `GameSystem` coordinates registered simulation interfaces and renders only
   through its registered `RenderTarget`. It chooses which game state is
   persistent through its registered `Persistence` interface and owns land and
@@ -172,9 +210,10 @@ terrain entity and initializes its position, elevation, slope, aspect, and
 drainage component slots.
 
 `TerrainMeshSystem` converts ECS elevation into the visible surface. Subtle
-height-based color variation helps expose the shape. Darker soil walls follow
-the uneven perimeter down to a flat bottom, preserving visible thickness for
-future underground layers.
+height-based color variation helps expose the shape. The uneven perimeter shows
+four naturally colored soil bands whose thicknesses match the thermal depth
+cells. Their interfaces follow the local terrain down to a closed bottom face,
+preserving a coherent block-like profile.
 
 `SunSystem` advances the sun from central day progress. `GameSystem` coordinates
 the registered simulation interfaces and submits terrain and sun together as
@@ -184,9 +223,10 @@ simulation.
 ### ECS terrain and chunks
 
 `GameSystem` owns an ECS `Registry`. Every terrain cell has a stable entity ID
-and three initial data-only components: `GridPosition`, `ChunkPosition`, and
-`Elevation`, whose value is explicitly measured in meters. Components are held
-in type-specific packed arrays; entities do not contain behavior.
+and data-only components for position, elevation, derived terrain analysis,
+surface temperature, and a four-value soil temperature profile. Elevation is
+measured in meters and temperature in degrees Celsius. Components are held in
+type-specific packed arrays; entities do not contain behavior.
 
 The world is partitioned into configurable square `Chunk` values. Each chunk
 contains the terrain entity IDs for its local cells, a simulation level, and a
@@ -232,6 +272,87 @@ during this phase. It writes only components belonging to the chunk currently
 being processed. Dynamic water transfer will still use the separate collection
 and application phases.
 
+### Surface temperature
+
+Every terrain entity has `SurfaceTemperature::celsius`, initialized from the
+configured air temperature. `SurfaceTemperatureSystem` runs after terrain
+analysis on every fixed tick. It reconstructs an upward surface normal from
+slope and aspect, then calculates solar incidence as the nonnegative dot product
+between that normal and the direction to the sun.
+
+Absorbed solar power is:
+
+```text
+solar irradiance × surface absorptivity × daylight intensity × solar incidence
+```
+
+Sensible heat exchange with the configured air is:
+
+```text
+heat-transfer coefficient × (surface temperature - air temperature)
+```
+
+Net longwave radiation toward the sky is:
+
+```text
+emissivity × Stefan-Boltzmann constant ×
+(surface absolute temperature⁴ - effective sky absolute temperature⁴)
+```
+
+Temperatures are converted from Celsius to kelvin before exponentiation. This
+term operates continuously, including at night, and increases rapidly for hot
+surfaces. A negative result correctly represents net infrared heating if the
+configured effective sky is warmer than the surface.
+
+Conductive heat flow between adjacent layers is:
+
+```text
+thermal conductance × (upper temperature - lower temperature)
+```
+
+The surface uses its configured contact conductance. Between soil layers,
+conductance is thermal conductivity divided by the distance between layer
+centres. Every internal flux is subtracted from the warmer-side energy balance
+and added to the cooler-side balance, so internal conduction conserves energy.
+Each layer's areal heat capacity is its thickness multiplied by volumetric heat
+capacity. All fluxes use the temperatures from the start of the tick, avoiding
+update-order artifacts.
+
+The default profile represents successive bands 0.1, 0.2, 0.5, and 1.2 metres
+thick. Its deepest band conducts toward a fixed 12 °C boundary at 3 metres. This
+provides a stable reservoir for the daily-scale simulation: shallow soil stores
+daytime heat, returns some after sunset, and gradually passes some deeper.
+`TerrainMeshSystem` uses those same thicknesses for the exposed perimeter
+strata, keeping visible underground geometry aligned with the thermal profile.
+The colors communicate depth only and are not authoritative soil-composition
+data.
+
+Net power multiplied by fixed-step seconds gives energy per square meter. That
+energy divided by surface heat capacity gives the temperature change in kelvin,
+which has the same interval size as degrees Celsius. Distance to the sun is not
+used because its variation across the modeled 32-meter world is physically
+negligible; `SunSystem` supplies a parallel directional-light vector separately
+from the nearby visual sun position. Surface orientation dominates spatial solar
+differences.
+
+This is still a deliberately limited energy balance. Its four bands are thermal
+depth cells, not geological horizons with distinct composition, and the fixed
+deep boundary is an explicit approximation. It does not yet include terrain
+shadows, soil moisture and latent heat, cloud-dependent sky temperature,
+wind-dependent convection, or changing air temperature. Those effects must be
+added explicitly rather than hidden in arbitrary offsets.
+
+Temperature is averaged from adjacent cells into terrain mesh vertices. Pressing
+T toggles a shader overlay with a fixed visual range from -10 °C (blue) through
+cyan and yellow to 50 °C (red). The overlay changes presentation only; it never
+changes simulation state.
+
+After every completed fixed tick, `SurfaceTemperatureSystem` sums the current
+temperature of every cell across every chunk and divides by the total cell
+count. `ScreenSystem` reads that value through the narrow
+`SurfaceTemperatureStatistics` interface. `ScreenSystem` renders the value in
+the stats window each frame; display rounding does not alter ECS values.
+
 ### Time architecture
 
 `main.cpp` updates `TimeSystem` before events and game state each frame.
@@ -252,7 +373,7 @@ or maintain an independent frame timer.
 `TimeSystem` derives a one-based day number and normalized day progress from
 simulation time and configured day length. `SunSystem` uses day progress for the
 sun orbit, making one orbit exactly one day. `ScreenSystem` displays the day
-number in its separate stats window and updates the title only when it changes.
+number inside its separate stats window.
 `ScreenSystem` combines that data with its registered camera frame, then passes
 the complete scene to `RenderSystem`. This keeps world creation out of the
 screen, camera, and Vulkan layers.

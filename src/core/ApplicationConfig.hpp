@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <string>
@@ -24,9 +25,29 @@ struct WorldConfig {
 };
 
 struct TimeConfig {
-    double fixedStepSeconds = 0.1;
-    double timeScale = 1.0;
-    double dayLengthSeconds = 60.0;
+    double fixedStepSeconds = 60.0;
+    double timeScale = 1440.0;
+    double dayLengthSeconds = 86400.0;
+};
+
+struct ClimateConfig {
+    float airTemperatureCelsius = 15.0F;
+    float solarIrradianceWattsPerSquareMeter = 1000.0F;
+    float surfaceAbsorptivity = 0.75F;
+    float surfaceHeatCapacityJoulesPerSquareMeterKelvin = 200000.0F;
+    float surfaceHeatTransferWattsPerSquareMeterKelvin = 10.0F;
+    float surfaceEmissivity = 0.95F;
+    float effectiveSkyTemperatureCelsius = -5.0F;
+};
+
+struct SoilThermalConfig {
+    float initialTemperatureCelsius = 15.0F;
+    float deepGroundTemperatureCelsius = 12.0F;
+    float thermalConductivityWattsPerMeterKelvin = 1.0F;
+    float volumetricHeatCapacityJoulesPerCubicMeterKelvin = 2000000.0F;
+    float surfaceConductanceWattsPerSquareMeterKelvin = 5.0F;
+    std::array<float, 4> layerThicknessMeters{0.1F, 0.2F, 0.5F, 1.2F};
+    float deepBoundaryDepthMeters = 3.0F;
 };
 
 struct ApplicationConfig {
@@ -34,6 +55,8 @@ struct ApplicationConfig {
     NetworkConfig network;
     WorldConfig world;
     TimeConfig time;
+    ClimateConfig climate;
+    SoilThermalConfig soil;
 };
 
 class ConfigLoader final {

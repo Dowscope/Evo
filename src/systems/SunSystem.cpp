@@ -17,16 +17,20 @@ void SunSystem::updateSun(Sun& sun, const TimeFrame& time) {
         _config.chunkSize * std::max(_config.chunksX, _config.chunksZ)
     ) * _config.cellSizeMeters;
     const float orbitRadius = worldWidth * 0.75F;
-    const float orbitHeight = worldWidth * 0.12F;
     const float sunAngle = static_cast<float>(time.dayProgress) *
                            2.0F * glm::pi<float>();
-    sun.position = {
-        std::cos(sunAngle) * orbitRadius,
-        orbitHeight + std::sin(sunAngle) * orbitRadius,
+    sun.direction = glm::normalize(glm::vec3{
+        std::cos(sunAngle),
+        std::sin(sunAngle),
         0.0F,
+    });
+    sun.position = {
+        sun.direction.x * orbitRadius,
+        sun.direction.y * orbitRadius,
+        sun.direction.z * orbitRadius,
     };
     sun.intensity = std::clamp(
-        (sun.position.y + worldWidth * 0.03F) / (worldWidth * 0.20F),
+        (sun.direction.y + 0.10F) / 0.30F,
         0.0F,
         1.0F
     );

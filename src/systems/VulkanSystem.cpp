@@ -26,6 +26,7 @@ struct DrawState {
     glm::mat4 viewProjection;
     glm::vec4 modelTranslation;
     glm::vec4 sun;
+    glm::vec4 display;
 };
 
 void require(VkResult result, const char* message) {
@@ -207,7 +208,9 @@ void VulkanSystem::_createPipeline() {
         VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32_SFLOAT,
             static_cast<std::uint32_t>(offsetof(Vertex, position))},
         VkVertexInputAttributeDescription{1, 0, VK_FORMAT_R32G32B32_SFLOAT,
-            static_cast<std::uint32_t>(offsetof(Vertex, color))}};
+            static_cast<std::uint32_t>(offsetof(Vertex, color))},
+        VkVertexInputAttributeDescription{2, 0, VK_FORMAT_R32_SFLOAT,
+            static_cast<std::uint32_t>(offsetof(Vertex, surfaceTemperatureCelsius))}};
     const VkPipelineVertexInputStateCreateInfo vertexInput{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
         .vertexBindingDescriptionCount = 1, .pVertexBindingDescriptions = &binding,
@@ -349,8 +352,13 @@ void VulkanSystem::render(const Scene& scene) {
     vkCmdBindVertexBuffers(_commandBuffer, 0, 1, &_vertexBuffer.handle, &offset);
     vkCmdBindIndexBuffer(_commandBuffer, _indexBuffer.handle, 0, VK_INDEX_TYPE_UINT32);
     const glm::mat4 viewProjection = scene.camera.projection * scene.camera.view;
-    const glm::vec4 lightingState{scene.sun.position, scene.sun.intensity};
-    const DrawState landState{viewProjection, glm::vec4{0.0F}, lightingState};
+    const glm::vec4 lightingState{scene.sun.direction, scene.sun.intensity};
+    const DrawState landState{
+        viewProjection,
+        glm::vec4{0.0F},
+        lightingState,
+        glm::vec4{scene.temperatureOverlay ? 1.0F : 0.0F, 0.0F, 0.0F, 0.0F},
+    };
     vkCmdPushConstants(_commandBuffer, _pipelineLayout,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         0, sizeof(landState), &landState);
@@ -360,7 +368,8 @@ void VulkanSystem::render(const Scene& scene) {
     const DrawState sunDrawState{
         viewProjection,
         glm::vec4{scene.sun.position, 1.0F},
-        glm::vec4{scene.sun.position, scene.sun.intensity},
+        glm::vec4{scene.sun.direction, scene.sun.intensity},
+        glm::vec4{0.0F},
     };
     vkCmdPushConstants(_commandBuffer, _pipelineLayout,
         VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

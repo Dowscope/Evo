@@ -9,6 +9,7 @@
 struct Vertex {
     glm::vec3 position;
     glm::vec3 color;
+    float surfaceTemperatureCelsius = 15.0F;
 };
 struct Land {
     std::vector<Vertex> vertices;
@@ -18,6 +19,7 @@ struct Land {
 
 struct Sun {
     glm::vec3 position{0.0F, 6.0F, 8.0F};
+    glm::vec3 direction{0.0F, 1.0F, 0.0F};
     float intensity = 1.0F;
 };
 
@@ -30,4 +32,5 @@ struct Scene {
     const Land* land = nullptr;
     Sun sun;
     CameraFrame camera;
+    bool temperatureOverlay = false;
 };

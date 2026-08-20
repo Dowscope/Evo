@@ -5,7 +5,10 @@
 
 class TerrainGenerationSystem final : public System, public TerrainGeneration {
 public:
-    TerrainGenerationSystem();
+    TerrainGenerationSystem(
+        ClimateConfig climateConfig,
+        SoilThermalConfig soilConfig
+    );
 
     void init() override;
     void generateTerrain(
@@ -21,4 +24,7 @@ private:
         float z,
         std::uint64_t seed
     );
+
+    ClimateConfig _climateConfig;
+    SoilThermalConfig _soilConfig;
 };
