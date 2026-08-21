@@ -66,6 +66,18 @@ std::string parseString(std::string_view value, std::string_view key) {
     return result;
 }
 
+bool parseBoolean(std::string_view value, std::string_view key) {
+    if (value == "true") {
+        return true;
+    }
+    if (value == "false") {
+        return false;
+    }
+    throw std::runtime_error(
+        "Invalid boolean config value for " + std::string(key)
+    );
+}
+
 } // namespace
 
 ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
@@ -116,6 +128,10 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
             config.window.width = parseNumber<int>(value, key);
         } else if (key == "window.height") {
             config.window.height = parseNumber<int>(value, key);
+        } else if (key == "stats.position") {
+            config.statsWindow.position = parseString(value, key);
+        } else if (key == "stats.always_on_top") {
+            config.statsWindow.alwaysOnTop = parseBoolean(value, key);
         } else if (key == "network.address") {
             config.network.address = parseString(value, key);
         } else if (key == "network.port") {
@@ -152,6 +168,8 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
                 parseNumber<float>(value, key);
         } else if (key == "climate.surface_emissivity") {
             config.climate.surfaceEmissivity = parseNumber<float>(value, key);
+        } else if (key == "climate.diffuse_solar_fraction") {
+            config.climate.diffuseSolarFraction = parseNumber<float>(value, key);
         } else if (key == "atmosphere.minimum_air_temperature_celsius") {
             config.atmosphere.minimumAirTemperatureCelsius =
                 parseNumber<float>(value, key);
@@ -202,6 +220,12 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
     if (config.window.title.empty() || config.window.width <= 0 ||
         config.window.height <= 0) {
         throw std::runtime_error("Window configuration is invalid");
+    }
+    if (config.statsWindow.position != "right" &&
+        config.statsWindow.position != "left") {
+        throw std::runtime_error(
+            "stats.position must be either right or left"
+        );
     }
     if (config.world.chunkSize < 2 || config.world.chunkSize > 64) {
         throw std::runtime_error("world.chunk_size must be between 2 and 64");
@@ -273,6 +297,13 @@ ApplicationConfig ConfigLoader::load(const std::filesystem::path& path) {
         config.climate.surfaceEmissivity > 1.0F) {
         throw std::runtime_error(
             "climate.surface_emissivity must be between 0 and 1"
+        );
+    }
+    if (!std::isfinite(config.climate.diffuseSolarFraction) ||
+        config.climate.diffuseSolarFraction < 0.0F ||
+        config.climate.diffuseSolarFraction > 1.0F) {
+        throw std::runtime_error(
+            "climate.diffuse_solar_fraction must be between 0 and 1"
         );
     }
     if (!std::isfinite(config.atmosphere.minimumAirTemperatureCelsius) ||

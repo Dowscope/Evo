@@ -27,7 +27,8 @@ meter world.
 produces deterministic fixed simulation steps.
 A separate stats window renders the current simulation day, average surface
 temperature, atmospheric air and sky temperatures, and overlay state inside its
-content area.
+content area. It starts beside the game window, preferring the configured side
+and falling back when the monitor lacks space.
 `ChunkSimulationSystem` executes deterministic local, boundary-collection, and
 boundary-application phases, while `SunSystem` owns solar behavior.
 Dedicated terrain generation, analysis, and mesh systems create ECS cells,
@@ -37,9 +38,14 @@ with the air, thermal-infrared radiation to the sky, and conduction through a
 four-layer ECS soil profile connected to a stable deep-ground boundary. Press
 `T` in either window to toggle the temperature overlay. The stats window
 reports whole-world average surface temperature.
-`AtmosphereSystem` supplies a smooth daily air-temperature cycle with a morning
-minimum and delayed afternoon maximum, plus effective clear-sky temperature as
-the foundation for future humidity, clouds, and precipitation.
+Each fixed tick also traces authoritative terrain elevation toward the sun:
+hill-shaded cells lose the direct solar beam but retain configurable diffuse sky
+irradiance, making their surface temperature cooler than exposed cells.
+`AtmosphereSystem` is an independent part of the world and supplies a smooth
+daily air-temperature cycle with a morning minimum and delayed afternoon
+maximum. `WeatherSystem` owns `TemperatureModule`, which calculates exchanges
+among sunlight, atmosphere, land surface, and soil. This boundary is the
+foundation for future humidity, cloud, wind, and precipitation processes.
 It includes a swapchain, depth buffer, graphics pipeline, compiled shaders,
 vertex/index buffers, frame synchronization, and resize recreation.
 

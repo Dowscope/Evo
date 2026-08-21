@@ -25,6 +25,7 @@ void ChunkSimulationSystem::simulate(
 ) {
     for (std::uint32_t step = 0; step < time.fixedSteps; ++step) {
         for (ChunkTickSystem* system : _tickSystems) {
+            system->beginTick(registry, chunks, time.fixedStepSeconds);
             for (Chunk& chunk : chunks) {
                 if (chunk.simulationLevel == SimulationLevel::Active) {
                     system->updateChunk(

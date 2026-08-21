@@ -1,17 +1,18 @@
 #pragma once
 
-#include "core/ApplicationConfig.hpp"
 #include "simulation/ChunkSimulation.hpp"
 #include "simulation/SurfaceTemperatureSimulation.hpp"
 #include "simulation/SurfaceTemperatureStatistics.hpp"
 #include "systems/System.hpp"
+#include "weather/TemperatureModule.hpp"
 
-class SurfaceTemperatureSystem final : public System,
-                                       public ChunkTickSystem,
-                                       public SurfaceTemperatureSimulation,
-                                       public SurfaceTemperatureStatistics {
+class WeatherSystem final : public System,
+                            public SurfaceTemperatureSimulation,
+                            public SurfaceTemperatureStatistics,
+                            public ChunkTickSystem {
 public:
-    SurfaceTemperatureSystem(
+    WeatherSystem(
+        WorldConfig worldConfig,
         ClimateConfig climateConfig,
         SoilThermalConfig soilConfig
     );
@@ -20,6 +21,11 @@ public:
     void setSunState(const Sun& sun) override;
     void setAtmosphereState(const AtmosphereState& atmosphere) override;
     [[nodiscard]] float averageSurfaceTemperatureCelsius() const override;
+    void beginTick(
+        Registry& registry,
+        std::span<Chunk> chunks,
+        double fixedStepSeconds
+    ) override;
     void updateChunk(
         Registry& registry,
         Chunk& chunk,
@@ -36,9 +42,5 @@ public:
     ) override;
 
 private:
-    ClimateConfig _climateConfig;
-    SoilThermalConfig _soilConfig;
-    Sun _sun;
-    AtmosphereState _atmosphere;
-    float _averageSurfaceTemperatureCelsius = 15.0F;
+    TemperatureModule _temperatureModule;
 };

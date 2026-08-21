@@ -34,13 +34,14 @@ add_executable(EVO
     src/systems/ScreenSystem.cpp
     src/systems/SaveSystem.cpp
     src/systems/SunSystem.cpp
-    src/systems/SurfaceTemperatureSystem.cpp
+    src/systems/WeatherSystem.cpp
     src/systems/TerrainAnalysisSystem.cpp
     src/systems/TerrainGenerationSystem.cpp
     src/systems/TerrainMeshSystem.cpp
     src/systems/System.cpp
     src/systems/TimeSystem.cpp
     src/systems/VulkanSystem.cpp
+    src/weather/TemperatureModule.cpp
 )
 
 target_compile_features(EVO PRIVATE cxx_std_23)

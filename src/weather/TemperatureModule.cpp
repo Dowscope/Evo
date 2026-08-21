@@ -1,4 +1,4 @@
-#include "systems/SurfaceTemperatureSystem.hpp"
+#include "weather/TemperatureModule.hpp"
 
 #include "ecs/components/TerrainComponents.hpp"
 
@@ -16,32 +16,115 @@ constexpr float stefanBoltzmannWattsPerSquareMeterKelvinFourth =
 
 } // namespace
 
-SurfaceTemperatureSystem::SurfaceTemperatureSystem(
+TemperatureModule::TemperatureModule(
+    WorldConfig worldConfig,
     ClimateConfig climateConfig,
     SoilThermalConfig soilConfig
-) : System("Surface Temperature"),
+) : _worldConfig(worldConfig),
     _climateConfig(climateConfig),
     _soilConfig(soilConfig) {}
 
-void SurfaceTemperatureSystem::init() {
-    System::init();
-}
-
-void SurfaceTemperatureSystem::setSunState(const Sun& sun) {
+void TemperatureModule::setSunState(const Sun& sun) {
     _sun = sun;
 }
 
-void SurfaceTemperatureSystem::setAtmosphereState(
+void TemperatureModule::setAtmosphereState(
     const AtmosphereState& atmosphere
 ) {
     _atmosphere = atmosphere;
 }
 
-float SurfaceTemperatureSystem::averageSurfaceTemperatureCelsius() const {
+float TemperatureModule::averageSurfaceTemperatureCelsius() const {
     return _averageSurfaceTemperatureCelsius;
 }
 
-void SurfaceTemperatureSystem::updateChunk(
+void TemperatureModule::beginTick(
+    Registry& registry,
+    std::span<Chunk> chunks,
+    double /* fixedStepSeconds */
+) {
+    const std::uint32_t cellsX =
+        _worldConfig.chunkSize * _worldConfig.chunksX;
+    const std::uint32_t cellsZ =
+        _worldConfig.chunkSize * _worldConfig.chunksZ;
+    std::vector<Entity> entities(cellsX * cellsZ, nullEntity);
+    for (const Chunk& chunk : chunks) {
+        for (const Entity entity : chunk.terrainCells) {
+            const GridPosition position = registry.get<GridPosition>(entity);
+            entities[position.z * cellsX + position.x] = entity;
+        }
+    }
+    _directSolarExposure.assign(cellsX * cellsZ, 1.0F);
+
+    const float horizontalSunLength = std::hypot(
+        _sun.direction.x,
+        _sun.direction.z
+    );
+    if (_sun.direction.y <= 0.0F || horizontalSunLength <= 1.0e-5F) {
+        return;
+    }
+    const float rayX = _sun.direction.x / horizontalSunLength;
+    const float rayZ = _sun.direction.z / horizontalSunLength;
+    const float verticalRisePerMeter =
+        _sun.direction.y / horizontalSunLength;
+    const float sampleStepMeters = _worldConfig.cellSizeMeters * 0.5F;
+    const float maximumDistanceMeters = std::hypot(
+        static_cast<float>(cellsX),
+        static_cast<float>(cellsZ)
+    ) * _worldConfig.cellSizeMeters;
+    constexpr float surfaceToleranceMeters = 0.02F;
+
+    for (std::uint32_t z = 0; z < cellsZ; ++z) {
+        for (std::uint32_t x = 0; x < cellsX; ++x) {
+            const Entity entity = entities[z * cellsX + x];
+            if (entity == nullEntity) {
+                continue;
+            }
+            const float originElevation =
+                registry.get<Elevation>(entity).meters;
+            for (float distanceMeters = sampleStepMeters;
+                 distanceMeters <= maximumDistanceMeters;
+                 distanceMeters += sampleStepMeters) {
+                const float sampleGridX = static_cast<float>(x) + 0.5F +
+                    rayX * distanceMeters / _worldConfig.cellSizeMeters;
+                const float sampleGridZ = static_cast<float>(z) + 0.5F +
+                    rayZ * distanceMeters / _worldConfig.cellSizeMeters;
+                const int sampleX = static_cast<int>(std::floor(sampleGridX));
+                const int sampleZ = static_cast<int>(std::floor(sampleGridZ));
+                if (sampleX < 0 || sampleZ < 0 ||
+                    sampleX >= static_cast<int>(cellsX) ||
+                    sampleZ >= static_cast<int>(cellsZ)) {
+                    break;
+                }
+                if (sampleX == static_cast<int>(x) &&
+                    sampleZ == static_cast<int>(z)) {
+                    continue;
+                }
+                const Entity sampleEntity = entities[
+                    static_cast<std::uint32_t>(sampleZ) * cellsX +
+                    static_cast<std::uint32_t>(sampleX)
+                ];
+                if (sampleEntity == nullEntity) {
+                    continue;
+                }
+                const float sampleCenterDistanceMeters =
+                    ((static_cast<float>(sampleX) - static_cast<float>(x)) *
+                         rayX +
+                     (static_cast<float>(sampleZ) - static_cast<float>(z)) *
+                         rayZ) * _worldConfig.cellSizeMeters;
+                const float rayElevation = originElevation +
+                    sampleCenterDistanceMeters * verticalRisePerMeter;
+                if (registry.get<Elevation>(sampleEntity).meters >
+                    rayElevation + surfaceToleranceMeters) {
+                    _directSolarExposure[z * cellsX + x] = 0.0F;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void TemperatureModule::updateChunk(
     Registry& registry,
     Chunk& chunk,
     std::span<Chunk> /* chunks */,
@@ -61,9 +144,21 @@ void SurfaceTemperatureSystem::updateChunk(
             };
         }
         const float incidence = std::max(glm::dot(normal, _sun.direction), 0.0F);
+        const GridPosition position = registry.get<GridPosition>(entity);
+        const std::uint32_t cellsX =
+            _worldConfig.chunkSize * _worldConfig.chunksX;
+        const float directExposure = _directSolarExposure.empty()
+            ? 1.0F
+            : _directSolarExposure[position.z * cellsX + position.x];
+        const float diffuseIncidence = std::max(_sun.direction.y, 0.0F) *
+            (0.5F + 0.5F * normal.y);
+        const float solarIncidence =
+            (1.0F - _climateConfig.diffuseSolarFraction) * incidence *
+                directExposure +
+            _climateConfig.diffuseSolarFraction * diffuseIncidence;
         const float absorbedSolarWattsPerSquareMeter =
             _climateConfig.solarIrradianceWattsPerSquareMeter *
-            _climateConfig.surfaceAbsorptivity * _sun.intensity * incidence;
+            _climateConfig.surfaceAbsorptivity * _sun.intensity * solarIncidence;
         SurfaceTemperature& temperature = registry.get<SurfaceTemperature>(entity);
         const float sensibleHeatLossWattsPerSquareMeter =
             _climateConfig.surfaceHeatTransferWattsPerSquareMeterKelvin *
@@ -145,7 +240,7 @@ void SurfaceTemperatureSystem::updateChunk(
     chunk.terrainMeshDirty = chunk.terrainMeshDirty || changed;
 }
 
-void SurfaceTemperatureSystem::collectBoundaryTransfers(
+void TemperatureModule::collectBoundaryTransfers(
     Registry& registry,
     std::span<Chunk> chunks
 ) {
@@ -164,7 +259,7 @@ void SurfaceTemperatureSystem::collectBoundaryTransfers(
     }
 }
 
-void SurfaceTemperatureSystem::applyBoundaryTransfers(
+void TemperatureModule::applyBoundaryTransfers(
     Registry& /* registry */,
     std::span<Chunk> /* chunks */
 ) {}

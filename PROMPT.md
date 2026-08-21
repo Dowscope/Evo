@@ -7,6 +7,16 @@ For every meaningful commit, update this contract when architecture or working
 rules change, add an entry under today's date in `CHANGELOG.md`, and update the
 user/programmer manual in `Documentation` when relevant.
 
+## Commit workflow
+
+- When the user requests a commit, first update every Markdown file affected by
+  the pending work. Always audit and update `PROMPT.md` and `CHANGELOG.md`.
+- Run appropriate builds or checks and `git diff --check` before staging.
+- Commit the complete requested milestone and push it to the current upstream
+  branch unless the user explicitly gives different commit or push instructions.
+- After pushing, confirm the local worktree is clean and the local and remote
+  branch tips match.
+
 ## Project
 
 - EVO is a C++23 game project.
@@ -26,6 +36,10 @@ user/programmer manual in `Documentation` when relevant.
   the configuration file themselves.
 - Window title and dimensions belong to `WindowConfig`. Future IP addresses and
   ports belong to `NetworkConfig`.
+- Stats-window preferred side and floating behavior belong to
+  `StatsWindowConfig`. Position it within the work area of the monitor containing
+  the game window, try the opposite side when necessary, and keep always-on-top
+  disabled by default.
 - Terrain seed, chunk size, chunk counts, and physical cell size belong to
   `WorldConfig`, which is passed only to `GameSystem`. Chunk size is validated
   from 2 through 64 cells, chunk counts from 1 through 64 per axis, and cell size
@@ -38,7 +52,8 @@ user/programmer manual in `Documentation` when relevant.
   use physical seconds: a 60-second tick and an 86400-second day, accelerated by
   a time scale of 1440.
 - Air temperature, solar irradiance, surface absorptivity, areal heat capacity,
-  surface heat-transfer coefficient and emissivity belong to `ClimateConfig`.
+  surface heat-transfer coefficient, emissivity, and diffuse-solar fraction
+  belong to `ClimateConfig`.
   Daily air-temperature extrema and hours plus clear-sky temperature offset
   belong to `AtmosphereConfig`. Soil initial and deep temperatures,
   conductivity, volumetric heat capacity, surface conductance, layer
@@ -115,6 +130,9 @@ this order so every consumer observes the current frame's timing snapshot.
   atmospheric air and sky temperatures, and overlay state in its content area.
   It receives timing and statistics only through explicitly registered narrow
   interfaces.
+- Stats placement accounts for decorated outer bounds, aligns window tops, and
+  clamps to the selected monitor's work area. `GLFW_FLOATING` follows the
+  explicit `stats.always_on_top` setting only.
 - `ScreenSystem` alone declares, owns, initializes, and accesses the rendering
   backend.
 - The main scene remains Vulkan-rendered. The auxiliary stats presentation may
@@ -176,11 +194,14 @@ this order so every consumer observes the current frame's timing snapshot.
 - The sun is game-world state coordinated by `GameSystem` and advanced through
   the registered `SunSimulation` interface implemented by `SunSystem`, then
   submitted through `Scene`. Rendering code must not own orbit simulation.
-- `AtmosphereSystem` owns `AtmosphereState` and derives its smooth daily cycle
-  only from the shared `TimeFrame`. `GameSystem` advances it before fixed chunk
-  simulation and passes it to temperature simulation through narrow interfaces.
-  Keep future humidity, pressure, wind, clouds, and precipitation in atmosphere
-  state or focused atmospheric systems rather than `GameSystem`.
+- `AtmosphereSystem` is a world-state peer of land and owns `AtmosphereState`. It
+  derives the atmospheric daily cycle from the shared `TimeFrame` and exposes
+  narrow simulation and statistics interfaces.
+- `WeatherSystem` owns plain process modules, currently `TemperatureModule`, and
+  participates in fixed chunk simulation. It may read explicit land,
+  atmosphere, and sun inputs but must not own those world domains. Keep future
+  wind, evaporation, cloud, and precipitation processes in focused weather
+  modules rather than `GameSystem`.
 - `SunSystem` derives sun position and intensity from normalized day progress
   and world dimensions. The renderer consumes those values for directional
   terrain lighting and the day/night sky transition; it must not independently
@@ -191,9 +212,9 @@ this order so every consumer observes the current frame's timing snapshot.
 - `Sun::position` places the visible representation near the modeled world;
   `Sun::direction` represents effectively parallel physical solar rays. Lighting
   and thermal systems use direction, never distance to the display mesh.
-- `SurfaceTemperatureSystem` receives current sun state through the narrow
-  `SurfaceTemperatureSimulation` interface and participates in fixed chunk
-  ticks after terrain analysis.
+- `WeatherSystem` receives current sun state through the narrow
+  `SurfaceTemperatureSimulation` interface and delegates fixed temperature work
+  to `TemperatureModule` after terrain analysis.
 
 ## ECS and world chunks
 
@@ -213,9 +234,10 @@ this order so every consumer observes the current frame's timing snapshot.
   Chunk layout and cell size may change through `WorldConfig`.
 - Terrain rendering is derived from ECS cell elevation. Render vertices are not
   authoritative simulation state.
-- Vulkan directional shadows affect presentation only. Do not sample or copy
-  the GPU shadow map back into ECS temperature. Physical terrain occlusion must
-  be implemented deterministically from authoritative elevation data.
+- Vulkan directional shadows affect presentation only and must never feed ECS
+  state. `TemperatureModule` independently traces authoritative elevation
+  toward the sun before each fixed tick, blocking only the direct-beam fraction
+  while retaining configured diffuse-sky irradiance.
 - `TerrainAnalysisSystem` derives slope in degrees, aspect in radians, and D8
   steepest-descent drainage. Flat terrain has undefined aspect; do not invent a
   direction. A null downhill neighbor means no lower cell exists inside the
@@ -230,6 +252,9 @@ this order so every consumer observes the current frame's timing snapshot.
   the fourth-power term. Solar incidence comes from slope/aspect and sun
   direction. Do not describe this limited model as a complete climate or
   soil-temperature model.
+- `ChunkTickSystem::beginTick` is the pre-local-update phase for whole-world
+  read-only preparation. Surface temperature uses it to build deterministic
+  cross-chunk solar exposure before any cell temperature is changed.
 - Soil conduction uses four configured-thickness thermal cells. Calculate every
   internal flux from the same pre-tick temperature snapshot and transfer equal
   and opposite energy between adjacent cells. Derive each layer's areal heat
@@ -240,8 +265,8 @@ this order so every consumer observes the current frame's timing snapshot.
   scale must not feed back into ECS simulation state.
 - Both GLFW windows register the shared key callback because either may own
   keyboard focus. The stats content mirrors overlay state as input confirmation.
-- `SurfaceTemperatureSystem` calculates whole-world average surface temperature
-  after local chunk updates and exposes it through the read-only
+- `TemperatureModule` calculates whole-world average surface temperature after
+  local chunk updates. `WeatherSystem` exposes it through the read-only
   `SurfaceTemperatureStatistics` interface. `ScreenSystem` displays one decimal
   place and must not derive or mutate simulation statistics itself.
 - Chunk simulation must be deterministic and chunk-local before parallelism is
@@ -282,9 +307,13 @@ main.cpp registers systems
     GameSystem  -> TerrainGeneration interface          <- TerrainGenerationSystem
     GameSystem  -> TerrainMeshing interface             <- TerrainMeshSystem
     ChunkSimulationSystem -> ChunkTickSystem            <- TerrainAnalysisSystem
-    ChunkSimulationSystem -> ChunkTickSystem            <- SurfaceTemperatureSystem
-    GameSystem -> SurfaceTemperatureSimulation          <- SurfaceTemperatureSystem
-    ScreenSystem -> SurfaceTemperatureStatistics        <- SurfaceTemperatureSystem
+    ChunkSimulationSystem -> ChunkTickSystem            <- WeatherSystem
+    GameSystem -> AtmosphereSimulation                   <- AtmosphereSystem
+    GameSystem -> SurfaceTemperatureSimulation          <- WeatherSystem
+    ScreenSystem -> AtmosphereStatistics                 <- AtmosphereSystem
+    ScreenSystem -> SurfaceTemperatureStatistics        <- WeatherSystem
+
+    WeatherSystem -> owns TemperatureModule
     ScreenSystem -> Camera interface                     <- CameraSystem
     ScreenSystem -> Clock interface                      <- TimeSystem
     ScreenSystem -> RenderSystem                        <- VulkanSystem

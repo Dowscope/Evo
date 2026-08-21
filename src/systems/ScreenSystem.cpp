@@ -10,6 +10,7 @@
 #include <GL/gl.h>
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 #include <iomanip>
 #include <sstream>
@@ -82,8 +83,12 @@ void drawText(const std::string& value, float x, float y, float scale) {
 
 } // namespace
 
-ScreenSystem::ScreenSystem(WindowConfig config)
-    : System("Screen"), _config(std::move(config)) {}
+ScreenSystem::ScreenSystem(
+    WindowConfig config,
+    StatsWindowConfig statsConfig
+) : System("Screen"),
+    _config(std::move(config)),
+    _statsConfig(std::move(statsConfig)) {}
 
 ScreenSystem::~ScreenSystem() {
     _renderer.reset();
@@ -120,6 +125,10 @@ void ScreenSystem::init() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(
+        GLFW_FLOATING,
+        _statsConfig.alwaysOnTop ? GLFW_TRUE : GLFW_FALSE
+    );
     _statsWindow = glfwCreateWindow(
         420,
         250,
@@ -130,11 +139,13 @@ void ScreenSystem::init() {
     if (_statsWindow == nullptr) {
         throw std::runtime_error("Failed to create the EVO stats window");
     }
+    _positionStatsWindow();
     glfwSetWindowUserPointer(_statsWindow, this);
     glfwSetKeyCallback(_statsWindow, _handleKey);
     glfwMakeContextCurrent(_statsWindow);
     glfwSwapInterval(0);
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_FLOATING, GLFW_FALSE);
 
     glfwSetWindowUserPointer(_window, this);
     glfwSetKeyCallback(_window, _handleKey);
@@ -284,6 +295,118 @@ void ScreenSystem::_emit(Event event) const {
     if (_eventCallback) {
         _eventCallback(event);
     }
+}
+
+void ScreenSystem::_positionStatsWindow() {
+    constexpr int gap = 12;
+    int gameX = 0;
+    int gameY = 0;
+    int gameWidth = 0;
+    int gameHeight = 0;
+    int statsWidth = 0;
+    int statsHeight = 0;
+    glfwGetWindowPos(_window, &gameX, &gameY);
+    glfwGetWindowSize(_window, &gameWidth, &gameHeight);
+    glfwGetWindowSize(_statsWindow, &statsWidth, &statsHeight);
+
+    int gameLeftFrame = 0;
+    int gameTopFrame = 0;
+    int gameRightFrame = 0;
+    int gameBottomFrame = 0;
+    int statsLeftFrame = 0;
+    int statsTopFrame = 0;
+    int statsRightFrame = 0;
+    int statsBottomFrame = 0;
+    glfwGetWindowFrameSize(
+        _window,
+        &gameLeftFrame,
+        &gameTopFrame,
+        &gameRightFrame,
+        &gameBottomFrame
+    );
+    glfwGetWindowFrameSize(
+        _statsWindow,
+        &statsLeftFrame,
+        &statsTopFrame,
+        &statsRightFrame,
+        &statsBottomFrame
+    );
+
+    const int gameOuterLeft = gameX - gameLeftFrame;
+    const int gameOuterTop = gameY - gameTopFrame;
+    const int gameOuterRight = gameX + gameWidth + gameRightFrame;
+    const int gameOuterBottom = gameY + gameHeight + gameBottomFrame;
+    const int statsOuterWidth =
+        statsLeftFrame + statsWidth + statsRightFrame;
+    const int statsOuterHeight =
+        statsTopFrame + statsHeight + statsBottomFrame;
+
+    int monitorCount = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    GLFWmonitor* selectedMonitor = glfwGetPrimaryMonitor();
+    int greatestOverlap = -1;
+    for (int index = 0; index < monitorCount; ++index) {
+        int workX = 0;
+        int workY = 0;
+        int workWidth = 0;
+        int workHeight = 0;
+        glfwGetMonitorWorkarea(
+            monitors[index], &workX, &workY, &workWidth, &workHeight
+        );
+        const int overlapWidth = std::max(
+            0,
+            std::min(gameOuterRight, workX + workWidth) -
+                std::max(gameOuterLeft, workX)
+        );
+        const int overlapHeight = std::max(
+            0,
+            std::min(gameOuterBottom, workY + workHeight) -
+                std::max(gameOuterTop, workY)
+        );
+        const int overlap = overlapWidth * overlapHeight;
+        if (overlap > greatestOverlap) {
+            greatestOverlap = overlap;
+            selectedMonitor = monitors[index];
+        }
+    }
+
+    int workX = 0;
+    int workY = 0;
+    int workWidth = 0;
+    int workHeight = 0;
+    glfwGetMonitorWorkarea(
+        selectedMonitor, &workX, &workY, &workWidth, &workHeight
+    );
+    const int workRight = workX + workWidth;
+    const int workBottom = workY + workHeight;
+    const int rightCandidate = gameOuterRight + gap;
+    const int leftCandidate = gameOuterLeft - gap - statsOuterWidth;
+    const bool rightFits = rightCandidate + statsOuterWidth <= workRight;
+    const bool leftFits = leftCandidate >= workX;
+
+    int statsOuterX = _statsConfig.position == "right"
+        ? rightCandidate
+        : leftCandidate;
+    if (_statsConfig.position == "right" && !rightFits && leftFits) {
+        statsOuterX = leftCandidate;
+    } else if (_statsConfig.position == "left" && !leftFits && rightFits) {
+        statsOuterX = rightCandidate;
+    }
+    statsOuterX = std::clamp(
+        statsOuterX,
+        workX,
+        std::max(workX, workRight - statsOuterWidth)
+    );
+    const int statsOuterY = std::clamp(
+        gameOuterTop,
+        workY,
+        std::max(workY, workBottom - statsOuterHeight)
+    );
+    glfwSetWindowPos(
+        _statsWindow,
+        statsOuterX + statsLeftFrame,
+        statsOuterY + statsTopFrame
+    );
 }
 
 void ScreenSystem::_renderStatsWindow() {

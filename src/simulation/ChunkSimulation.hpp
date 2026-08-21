@@ -9,6 +9,11 @@
 class ChunkTickSystem {
 public:
     virtual ~ChunkTickSystem() = default;
+    virtual void beginTick(
+        Registry& /* registry */,
+        std::span<Chunk> /* chunks */,
+        double /* fixedStepSeconds */
+    ) {}
     virtual void updateChunk(
         Registry& registry,
         Chunk& chunk,

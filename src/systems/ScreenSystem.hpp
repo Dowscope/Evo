@@ -26,7 +26,7 @@ class ScreenSystem final : public System,
                            public EventListener,
                            public RenderTarget {
 public:
-    explicit ScreenSystem(WindowConfig config);
+    ScreenSystem(WindowConfig config, StatsWindowConfig statsConfig);
     ~ScreenSystem() override;
 
     void init() override;
@@ -64,10 +64,12 @@ private:
 
     void _emit(Event event) const;
     void _renderStatsWindow();
+    void _positionStatsWindow();
 
     GLFWwindow* _window = nullptr;
     GLFWwindow* _statsWindow = nullptr;
     WindowConfig _config;
+    StatsWindowConfig _statsConfig;
     EventCallback _eventCallback;
     std::unique_ptr<RenderSystem> _renderer;
     Camera* _camera = nullptr;

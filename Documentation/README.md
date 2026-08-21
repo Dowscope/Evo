@@ -21,6 +21,10 @@ area displays the current simulation day, whole-world average surface
 temperature rounded to one decimal degree Celsius, and temperature-overlay
 state. The day counter follows simulation time, so it stops while simulation
 time is paused and responds to the configured time scale.
+The stats window starts to the configured side of the game window with aligned
+top edges and a small gap. If it does not fit in that monitor's usable work area,
+EVO tries the opposite side and then clamps it on-screen. Always-on-top behavior
+is configurable but disabled by default.
 
 ### Camera controls
 
@@ -54,6 +58,8 @@ Edit `config/config.json` before starting EVO to change startup settings:
   "window.title": "EVO",
   "window.width": 1280,
   "window.height": 720,
+  "stats.position": "right",
+  "stats.always_on_top": false,
   "network.address": "127.0.0.1",
   "network.port": 0,
   "world.seed": 0,
@@ -70,6 +76,7 @@ Edit `config/config.json` before starting EVO to change startup settings:
   "climate.surface_heat_capacity_j_m2_k": 200000.0,
   "climate.surface_heat_transfer_w_m2_k": 10.0,
   "climate.surface_emissivity": 0.95,
+  "climate.diffuse_solar_fraction": 0.15,
   "atmosphere.minimum_air_temperature_celsius": 10.0,
   "atmosphere.maximum_air_temperature_celsius": 22.0,
   "atmosphere.minimum_temperature_hour": 6.0,
@@ -90,6 +97,10 @@ Edit `config/config.json` before starting EVO to change startup settings:
 
 The network values are reserved for future networking. Invalid settings stop
 startup with an error rather than silently selecting an unexpected value.
+`stats.position` accepts `"right"` or `"left"` and defines the preferred side
+of the game window. Placement automatically falls back to the other side when
+needed. `stats.always_on_top` accepts JSON `true` or `false`; its default is
+`false` so the stats window behaves normally when switching applications.
 Set `world.seed` to `0` to create a fresh random landscape on every launch. EVO
 prints the selected seed in the terminal and immediately checkpoints it as
 `world.last_seed` in `Data/evo.save`. Copy that nonzero value back into
@@ -125,6 +136,9 @@ use simulation-local time from 0 through 24 and must place the minimum before
 the maximum. The clear-sky offset is added to current air temperature to derive
 effective sky temperature. Defaults produce 10 °C air at 06:00, 22 °C at
 15:00, and a sky equivalent 20 °C colder than the air.
+`climate.diffuse_solar_fraction` is the zero-to-one share of daylight treated as
+sky-scattered rather than direct-beam radiation. The default 0.15 lets shaded
+terrain receive diffuse light without receiving the blocked direct beam.
 
 ### Saved progress
 
@@ -187,8 +201,9 @@ This keeps implementations replaceable and makes dependencies visible in
   chunks as a registered fixed-tick processor.
 - `TerrainMeshSystem` rebuilds revisioned render geometry only when a chunk marks
   its terrain mesh dirty.
-- `SurfaceTemperatureSystem` applies solar energy and sensible heat exchange to
-  every active terrain cell as a fixed-tick ECS processor.
+- `AtmosphereSystem` owns atmospheric world state. `WeatherSystem` owns the
+  temperature process module and exposes its narrow simulation and statistics
+  interfaces.
 - `GameSystem` coordinates registered simulation interfaces and renders only
   through its registered `RenderTarget`. It chooses which game state is
   persistent through its registered `Persistence` interface and owns land and
@@ -288,16 +303,27 @@ and application phases.
 ### Surface temperature
 
 Every terrain entity has `SurfaceTemperature::celsius`, initialized from the
-configured initial surface temperature. `SurfaceTemperatureSystem` runs after
-terrain analysis on every fixed tick. It reconstructs an upward surface normal from
+configured initial surface temperature. `TemperatureModule` runs through its
+owning `WeatherSystem` after terrain analysis on every fixed tick. It
+reconstructs an upward surface normal from
 slope and aspect, then calculates solar incidence as the nonnegative dot product
 between that normal and the direction to the sun.
 
 Absorbed solar power is:
 
 ```text
-solar irradiance × surface absorptivity × daylight intensity × solar incidence
+solar irradiance × surface absorptivity × daylight intensity ×
+((1 - diffuse fraction) × direct incidence × terrain exposure
+ + diffuse fraction × diffuse incidence)
 ```
+
+Before each fixed temperature tick, `TemperatureModule` builds a lookup
+of authoritative ECS elevations and traces horizontally from every cell toward
+the sun. The ray rises according to solar elevation. A terrain cell above that
+ray blocks direct exposure; vertically overhead sunlight is unobstructed. The
+calculation uses physical cell size and is deterministic across chunk
+boundaries. Diffuse incidence uses solar elevation and an upward-facing sky-view
+factor, so shade remains cooler without becoming thermally black.
 
 Sensible heat exchange with the configured air is:
 
@@ -350,22 +376,21 @@ differences.
 
 This is still a deliberately limited energy balance. Its four bands are thermal
 depth cells, not geological horizons with distinct composition, and the fixed
-deep boundary is an explicit approximation. It does not yet include terrain
-shadow occlusion in the thermal calculation, soil moisture and latent heat,
-cloud-dependent sky temperature, or wind-dependent convection. Those effects
-must be added explicitly rather than hidden in arbitrary offsets.
+deep boundary is an explicit approximation. It does not yet include soil
+moisture and latent heat, cloud-dependent sky temperature, or wind-dependent
+convection. Those effects must be added explicitly rather than hidden in
+arbitrary offsets.
 
-Directional shadows are currently presentation-only. The GPU shadow map does
-not feed ECS temperature because render data is not authoritative simulation
-state. Thermal terrain shading will require a deterministic CPU-side horizon or
-ray-occlusion calculation using ECS elevation.
+Visual and physical shadows remain deliberately separate implementations. The
+Vulkan shadow map provides filtered presentation, while ECS ray occlusion
+controls direct solar energy. GPU render data never feeds simulation state.
 
 Temperature is averaged from adjacent cells into terrain mesh vertices. Pressing
 T toggles a shader overlay with a fixed visual range from -10 °C (blue) through
 cyan and yellow to 50 °C (red). The overlay changes presentation only; it never
 changes simulation state.
 
-After every completed fixed tick, `SurfaceTemperatureSystem` sums the current
+After every completed fixed tick, `TemperatureModule` sums the current
 temperature of every cell across every chunk and divides by the total cell
 count. `ScreenSystem` reads that value through the narrow
 `SurfaceTemperatureStatistics` interface. `ScreenSystem` renders the value in
@@ -390,6 +415,21 @@ The current atmosphere is spatially uniform and deterministic. Its dedicated
 state and system boundary are intended to accept humidity, pressure, wind,
 cloud water, and precipitation later; none of those are implied by the present
 temperature cycle.
+
+### Weather module boundary
+
+Atmosphere and land are peer parts of the world. `AtmosphereSystem` owns air and
+sky state, while land ECS components own surface and soil state. `WeatherSystem`
+owns `TemperatureModule` by composition and calculates the energy exchanged
+between those peers using explicit sun and atmosphere inputs. It delegates fixed
+chunk phases and read-only temperature statistics through narrow interfaces.
+
+`TemperatureModule` is a plain class rather than a `System` subclass. It does not
+own windows, rendering, events, persistence, system lifecycle, atmosphere, land,
+or global service lookup. Temperature configuration and equations remain inside
+the module; orchestration remains inside `WeatherSystem`. Future wind,
+evaporation, cloud, and precipitation process modules should follow the same
+boundary and operate on explicit world-owned state.
 
 ### Time architecture
 

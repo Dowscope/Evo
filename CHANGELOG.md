@@ -3,6 +3,56 @@
 All notable changes to EVO are documented here. Entries are grouped by date and
 use the categories from [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-08-21 - Modular Weather Architecture
+
+### Added
+
+- Added `WeatherSystem` as the engine-facing owner of weather process modules.
+- Added independent plain-class `TemperatureModule` under `src/weather/`.
+
+### Changed
+
+- Moved surface temperature, soil conduction, physical terrain shade, and
+  temperature statistics out of a top-level system into `TemperatureModule`.
+- Kept `AtmosphereSystem` as an independent world-state peer of land and routed
+  its explicit state into weather calculations.
+- Registered `WeatherSystem` for temperature simulation and statistics while
+  keeping `TemperatureModule` independent of rendering, windows, events,
+  persistence, atmosphere ownership, and engine lifecycle.
+
+## 2026-08-21 - Physical Terrain Shade
+
+### Added
+
+- Added deterministic CPU-side terrain ray occlusion from every ECS cell toward
+  the physical sun before each fixed temperature tick.
+- Added configurable diffuse-solar fraction, defaulting to 0.15, so shaded cells
+  retain sky-scattered daylight while losing the blocked direct beam.
+- Added a `ChunkTickSystem::beginTick` preparation phase for cross-chunk,
+  read-only calculations before local component updates.
+
+### Changed
+
+- Changed absorbed shortwave energy to combine exposed direct incidence with
+  slope-aware diffuse incidence.
+- Kept filtered Vulkan shadows presentation-only while using authoritative ECS
+  elevation independently for physical solar heating.
+
+## 2026-08-21 - Stats Window Placement
+
+### Added
+
+- Added `stats.position` configuration with validated `right` and `left`
+  preferences.
+- Added a JSON boolean `stats.always_on_top` option, disabled by default.
+
+### Changed
+
+- Positioned the stats window beside the decorated game window, aligned their
+  top edges, and added a small gap.
+- Added multi-monitor work-area selection, opposite-side fallback, and on-screen
+  clamping when the preferred side lacks space.
+
 ## 2026-08-20 - Directional Terrain Shadows
 
 ### Added

@@ -11,6 +11,11 @@ struct WindowConfig {
     int height = 720;
 };
 
+struct StatsWindowConfig {
+    std::string position = "right";
+    bool alwaysOnTop = false;
+};
+
 struct NetworkConfig {
     std::string address = "127.0.0.1";
     std::uint16_t port = 0;
@@ -37,6 +42,7 @@ struct ClimateConfig {
     float surfaceHeatCapacityJoulesPerSquareMeterKelvin = 200000.0F;
     float surfaceHeatTransferWattsPerSquareMeterKelvin = 10.0F;
     float surfaceEmissivity = 0.95F;
+    float diffuseSolarFraction = 0.15F;
 };
 
 struct AtmosphereConfig {
@@ -59,6 +65,7 @@ struct SoilThermalConfig {
 
 struct ApplicationConfig {
     WindowConfig window;
+    StatsWindowConfig statsWindow;
     NetworkConfig network;
     WorldConfig world;
     TimeConfig time;
